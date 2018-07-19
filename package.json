@@ -1,0 +1,12 @@
+{
+  "name": "colorcode",
+  "version": "0.0.1",
+  "description": "Fun game about guessing color code",
+  "scripts": {
+    "elm": "elm",
+    "build": "elm make src/Main.elm --output dist/bundle.js"
+  },
+  "dependencies": {
+    "elm": "^0.18.0"
+  }
+}
