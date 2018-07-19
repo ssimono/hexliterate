@@ -1,22 +1,52 @@
-import Html exposing (Html, button, div, text)
-import Html.Events exposing (onClick)
+import Html exposing (Html, button, div, text, input, hr, ul, li)
+import Html.Events exposing (onClick, onInput)
+import Html.Attributes exposing (..)
+
+init = { players = []
+       , editedPlayer = ""
+       , state = Lobby
+       }
 
 main =
-  Html.beginnerProgram { model = 0, view = view, update = update }
+  Html.beginnerProgram { model = init, view = view, update = update }
 
-type Msg = Increment | Decrement
+type GameState
+  = Lobby
+  | Arena
+
+type Msg
+  = EditPlayer String
+  | NewPlayer
+  | StartGame
 
 update msg model =
   case msg of
-    Increment ->
-      model + 1
+    EditPlayer name ->
+      { model | editedPlayer = name }
 
-    Decrement ->
-      model - 1
+    NewPlayer ->
+      { model
+      | players = List.append model.players [model.editedPlayer]
+      , editedPlayer = ""
+      }
+
+    StartGame ->
+      { model | state = Arena }
+
+lobbyView model =
+  div []
+    [ input [ onInput EditPlayer, value model.editedPlayer ] []
+    , button [ onClick NewPlayer ] [ text "Sign up" ]
+    , div [] [ text (String.join ", " model.players) ]
+    , hr [] []
+    , button [ onClick StartGame ] [ text "Start game" ]
+    ]
+
+arenaView model =
+  div []
+    [ ul [] (List.map (\player -> li [] [ text player, input [] [] ]) model.players) ]
 
 view model =
-  div []
-    [ button [ onClick Decrement ] [ text "-" ]
-    , div [] [ text (toString model) ]
-    , button [ onClick Increment ] [ text "+" ]
-    ]
+  case model.state of
+    Lobby -> lobbyView model
+    Arena-> arenaView model
