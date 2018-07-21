@@ -1,0 +1,7 @@
+# Little utility to easily access elm commands
+# located in node_modules/.bin
+#
+# Usage: source activate
+
+PS1=(elm)$PS1
+export PATH="$PWD/node_modules/.bin:$PATH"

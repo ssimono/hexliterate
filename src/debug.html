@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Multi player simulation</title>
+    <meta name="description" contents="A fun game for nerdy people">
+    <style>
+    body {
+      background-color: Khaki;
+    }
+    main {
+      display: flex;
+      flex-wrap: wrap;
+    }
+    #add {
+      height: 50px;
+      margin-left: 20px;
+      width: 50px;
+    }
+    .phone {
+      background-color: #222;
+      border: 3px solid black;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      height: 400px;
+      margin: 3px;
+      padding: 10px;
+      width: 250px;
+    }
+    .phone iframe {
+      background-color: #fff;
+      border: none;
+      height: 100%;
+      margin: 5px 0;
+      width: 100%;
+    }
+    .phone hr {
+      width: 25%;
+    }
+    </style>
+  </head>
+  <body>
+    <main>
+      <button id="add">+</button>
+    </main>
+    <script>
+      const add = document.getElementById('add')
+      const container = document.querySelector('main')
+
+      const addPhone = () => {
+        const phone = document.createElement('DIV')
+        phone.classList.add('phone')
+        phone.innerHTML = `<hr><iframe src="index.html"></iframe><button class="close">close</button>`
+        container.insertBefore(phone, add)
+      }
+
+      add.addEventListener('click', addPhone)
+
+      container.addEventListener('click', (e) => {
+        if (e.target.classList.contains('close')) {
+          e.target.parentElement.remove()
+        }
+      })
+
+      const initPhones = (() => {
+        const check = /phones=(\d+)/
+        const match = check.exec(document.location)
+        return match
+         ? parseInt(match[1], 10)
+         : 0
+      })()
+      for (let i=0 ; i < initPhones ; ++i) addPhone()
+    </script>
+  </body>
+</html>
