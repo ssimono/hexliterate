@@ -13,3 +13,15 @@ dist:
 
 node_modules: package.json
 	npm install
+
+up:
+	GAME_FOLDER="$(shell pwd)/games" websocketd\
+	  --passenv GAME_FOLDER\
+	  --staticdir="$(shell pwd)/dist"\
+		--port=8000\
+		"$(shell pwd)/socket.sh"
+.PHONY: up
+
+format:
+	elm format src/*.elm
+.PHONY: format

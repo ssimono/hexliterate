@@ -10,7 +10,10 @@
     <div id="main"></div>
     <script src="bundle.js"></script>
     <script>
-      const app = Elm.Main.embed(document.getElementById('main'))
+      const app = Elm.Main.embed(
+        document.getElementById('main'),
+        'ws://localhost:8000'
+      )
     </script>
   </body>
 </html>
