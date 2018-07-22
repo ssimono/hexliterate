@@ -10,6 +10,9 @@ type alias Model =
     { username : String
     , players : List String
     , stage : GameStage
+    , secretColor : String
+    , answer : String
+    , answers : List ( String, String )
     , wsServer : String
     , error : String
     }
@@ -28,6 +31,9 @@ init ws_server =
     ( { username = ""
       , players = []
       , stage = Frontdesk
+      , secretColor = ""
+      , answer = ""
+      , answers = []
       , wsServer = ws_server
       , error = ""
       }
@@ -39,6 +45,7 @@ type GameStage
     = Frontdesk
     | Lobby
     | Arena
+    | Debrief
 
 
 type Msg
@@ -48,6 +55,9 @@ type Msg
     | NewPlayer String
     | Error String
     | StartGame
+    | GameStarted String
+    | EditAnswer String
+    | AnswerSubmitted String String
     | NoOp
 
 
@@ -70,6 +80,9 @@ update msg model =
 
                 Arena ->
                     arenaUpdate msg model
+
+                Debrief ->
+                    debriefUpdate msg model
 
 
 frontdeskUpdate : Msg -> Model -> ( Model, Cmd Msg )
@@ -103,7 +116,14 @@ lobbyUpdate msg model =
             )
 
         StartGame ->
-            ( { model | stage = Arena }, Cmd.none )
+            ( model
+            , WebSocket.send model.wsServer "start-game"
+            )
+
+        GameStarted secretColor ->
+            ( { model | stage = Arena, secretColor = secretColor }
+            , Cmd.none
+            )
 
         _ ->
             ( model, Cmd.none )
@@ -111,6 +131,44 @@ lobbyUpdate msg model =
 
 arenaUpdate : Msg -> Model -> ( Model, Cmd Msg )
 arenaUpdate msg model =
+    case msg of
+        EditAnswer answer ->
+            ( { model | answer = answer }
+            , if String.length answer == 6 then
+                WebSocket.send model.wsServer ("submit " ++ answer)
+              else
+                Cmd.none
+            )
+
+        AnswerSubmitted player answer ->
+            let
+                legit =
+                    List.any (\p -> p == player) model.players
+                        && not (List.member player (List.map (\( p, a ) -> p) model.answers))
+
+                done =
+                    legit && List.length model.players == List.length model.answers + 1
+            in
+            ( if legit then
+                { model
+                    | answers = List.append model.answers [ ( player, answer ) ]
+                    , stage =
+                        if done then
+                            Debrief
+                        else
+                            Arena
+                }
+              else
+                model
+            , Cmd.none
+            )
+
+        _ ->
+            ( model, Cmd.none )
+
+
+debriefUpdate : Msg -> Model -> ( Model, Cmd Msg )
+debriefUpdate msg model =
     ( model, Cmd.none )
 
 
@@ -131,6 +189,12 @@ handleSocket message =
         [ date, author, "join" ] ->
             NewPlayer author
 
+        [ date, author, "start-game", secretColor ] ->
+            GameStarted secretColor
+
+        [ date, author, "submit", answer ] ->
+            AnswerSubmitted author answer
+
         _ ->
             Error ("Bad message format: " ++ message)
 
@@ -148,6 +212,9 @@ view model =
 
                 Arena ->
                     arenaView model
+
+                Debrief ->
+                    debriefView model
 
         error =
             if not (String.isEmpty model.error) then
@@ -184,9 +251,52 @@ lobbyView model =
     in
     [ p [] [ text ("Signed up as " ++ model.username) ]
     , ul [] (List.map listItem (List.filter notMe model.players))
+    , button [ onClick StartGame ] [ text "START" ]
     ]
 
 
 arenaView : Model -> List (Html Msg)
 arenaView model =
-    [ ul [] (List.map (\player -> li [] [ text player, input [] [] ]) model.players) ]
+    let
+        done =
+            List.any (\( p, a ) -> p == model.username) model.answers
+
+        disabled =
+            if done then
+                [ attribute "disabled" "1" ]
+            else
+                []
+
+        others =
+            List.map (\( p, a ) -> p) (List.filter (\( p, a ) -> p /= model.username) model.answers)
+    in
+    [ p [] [ text "Will you guess?" ]
+    , div
+        [ style
+            [ ( "background-color", "#" ++ model.secretColor )
+            , ( "height", "100px" )
+            ]
+        ]
+        [ ul [] (List.map (\p -> li [] [ text (p ++ " is done!") ]) others)
+        ]
+    , input (List.append disabled [ onInput EditAnswer, value model.answer ]) []
+    ]
+
+
+debriefView : Model -> List (Html Msg)
+debriefView model =
+    [ div
+        [ style
+            [ ( "background-color", "#" ++ model.secretColor )
+            , ( "height", "100px" )
+            ]
+        ]
+        [ text ("The answer was #" ++ model.secretColor) ]
+    , hr [] []
+    , ul [] (List.map showAnswer model.answers)
+    ]
+
+
+showAnswer ( player, answer ) =
+    li [ style [ ( "background-color", "#" ++ answer ) ] ]
+        [ text (player ++ " guessed #" ++ answer) ]
