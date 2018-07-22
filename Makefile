@@ -18,8 +18,8 @@ up:
 	GAME_FOLDER="$(shell pwd)/games" websocketd\
 	  --passenv GAME_FOLDER\
 	  --staticdir="$(shell pwd)/dist"\
-		--port=8000\
-		"$(shell pwd)/socket.sh"
+	  --port=8000\
+	  "$(shell pwd)/socket.sh"
 .PHONY: up
 
 format:

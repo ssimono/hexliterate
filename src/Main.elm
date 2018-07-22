@@ -1,6 +1,6 @@
 module Main exposing (..)
 
-import Html exposing (Html, button, div, hr, input, li, p, text, ul)
+import Html exposing (Html, button, div, h2, h3, hr, input, li, p, text, ul)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import WebSocket
@@ -10,6 +10,8 @@ type alias Model =
     { username : String
     , players : List String
     , stage : GameStage
+    , games : List String
+    , gameId : Maybe String
     , secretColor : String
     , answer : String
     , answers : List ( String, String )
@@ -31,6 +33,8 @@ init ws_server =
     ( { username = ""
       , players = []
       , stage = Frontdesk
+      , gameId = Nothing
+      , games = []
       , secretColor = ""
       , answer = ""
       , answers = []
@@ -52,6 +56,11 @@ type Msg
     = EditUsername String
     | Register
     | Registered String
+    | RefreshGames
+    | ListReceived (List String)
+    | CreateGame
+    | JoinGame String
+    | LeaveGame
     | NewPlayer String
     | Error String
     | StartGame
@@ -69,6 +78,18 @@ update msg model =
 
         NoOp ->
             ( model, Cmd.none )
+
+        LeaveGame ->
+            let
+                ( initial, _ ) =
+                    init model.wsServer
+            in
+            ( { initial
+                | username = model.username
+                , stage = Lobby
+              }
+            , WebSocket.send model.wsServer "list"
+            )
 
         _ ->
             case model.stage of
@@ -98,7 +119,7 @@ frontdeskUpdate msg model =
 
         Registered username ->
             ( { model | username = username, stage = Lobby }
-            , WebSocket.send model.wsServer "join"
+            , WebSocket.send model.wsServer "list"
             )
 
         _ ->
@@ -107,20 +128,36 @@ frontdeskUpdate msg model =
 
 lobbyUpdate : Msg -> Model -> ( Model, Cmd Msg )
 lobbyUpdate msg model =
-    case msg of
-        NewPlayer name ->
+    case ( model.gameId, msg ) of
+        ( Nothing, RefreshGames ) ->
+            ( model, WebSocket.send model.wsServer "list" )
+
+        ( Nothing, ListReceived games ) ->
+            ( { model | games = games }, Cmd.none )
+
+        ( Nothing, CreateGame ) ->
+            ( model
+            , WebSocket.send model.wsServer "create"
+            )
+
+        ( Nothing, JoinGame gameId ) ->
+            ( { model | gameId = Just gameId }
+            , WebSocket.send model.wsServer ("join " ++ gameId)
+            )
+
+        ( Just gameId, NewPlayer name ) ->
             ( { model
                 | players = List.append model.players [ name ]
               }
             , Cmd.none
             )
 
-        StartGame ->
+        ( Just gameId, StartGame ) ->
             ( model
             , WebSocket.send model.wsServer "start"
             )
 
-        GameStarted secretColor ->
+        ( Just gameId, GameStarted secretColor ) ->
             ( { model | stage = Arena, secretColor = secretColor }
             , Cmd.none
             )
@@ -144,8 +181,8 @@ arenaUpdate msg model =
             let
                 legit =
                     (&&)
-                      (model.players |> List.any ((==) player))
-                      (model.answers |> List.all (\(p,a) -> p /= player))
+                        (model.players |> List.any ((==) player))
+                        (model.answers |> List.all (\( p, a ) -> p /= player))
 
                 done =
                     legit && List.length model.players == List.length model.answers + 1
@@ -181,14 +218,20 @@ subscriptions model =
 handleSocket message =
     let
         parts =
-          String.split " " message |> List.filter (\s -> not (String.isEmpty s))
+            String.split " " message |> List.filter (\s -> not (String.isEmpty s))
     in
     case parts of
         [ date, author, "registered" ] ->
             Registered author
 
-        [ date, author, "join" ] ->
+        date :: author :: "list" :: games ->
+            ListReceived (games |> String.join "" |> String.split ",")
+
+        [ date, author, "join", gameId ] ->
             NewPlayer author
+
+        [ date, author, "create", gameId ] ->
+            JoinGame gameId
 
         [ date, author, "start", secretColor ] ->
             GameStarted secretColor
@@ -243,17 +286,31 @@ frontedeskView model =
 
 lobbyView : Model -> List (Html Msg)
 lobbyView model =
-    let
-        listItem player =
-            li [] [ text (player ++ " is ready") ]
+    case model.gameId of
+        Nothing ->
+            let
+                gameItem gid =
+                    li [] [ Html.a [ href "#", onClick (JoinGame gid) ] [ text ("Join " ++ gid) ] ]
+            in
+            [ h2 [] [ text "Join a game" ]
+            , p [] [ button [ onClick RefreshGames ] [ text "Refresh list" ] ]
+            , ul [] (List.map gameItem model.games)
+            , p [] [ button [ onClick CreateGame ] [ text "Or create one" ] ]
+            ]
 
-        notMe player =
-            player /= model.username
-    in
-    [ p [] [ text ("Signed up as " ++ model.username) ]
-    , ul [] (List.map listItem (List.filter notMe model.players))
-    , button [ onClick StartGame ] [ text "START" ]
-    ]
+        Just gameId ->
+            let
+                listItem player =
+                    li [] [ text (player ++ " is ready") ]
+
+                notMe player =
+                    player /= model.username
+            in
+            [ h3 [] [ text gameId ]
+            , p [] [ text ("Signed up as " ++ model.username) ]
+            , ul [] (List.map listItem (List.filter notMe model.players))
+            , button [ onClick StartGame ] [ text "Go!" ]
+            ]
 
 
 arenaView : Model -> List (Html Msg)
@@ -289,12 +346,14 @@ debriefView model =
     [ div
         [ style
             [ ( "background-color", "#" ++ model.secretColor )
-            , ( "height", "100px" )
+            , ( "margin", "10px" )
             ]
         ]
-        [ text ("The answer was #" ++ model.secretColor) ]
-    , hr [] []
-    , ul [] (List.map showAnswer model.answers)
+        [ text ("The answer was #" ++ model.secretColor)
+        , hr [] []
+        , ul [] (List.map showAnswer model.answers)
+        , button [ onClick LeaveGame ] [ text "Home" ]
+        ]
     ]
 
 
