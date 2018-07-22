@@ -6,7 +6,7 @@ username="anonymous"
 validate='
 /^register [a-zA-Z0-9_\-]\{1,\}$/p;
 /^join$/p;
-/^start-game$/p;
+/^start$/p;
 /^submit [a-fA-F0-9]\{6\}$/p;
 '
 
@@ -30,7 +30,7 @@ do
   "join")
     cat $game
     ;;
-  "start-game")
+  "start")
     line="$line `head -c 100 /dev/urandom | sha1sum -b | head -c 6`"
     ;;
   esac

@@ -93,7 +93,7 @@ frontdeskUpdate msg model =
 
         Register ->
             ( model
-            , WebSocket.send model.wsServer ("register " ++ model.username)
+            , "register " ++ model.username |> WebSocket.send model.wsServer
             )
 
         Registered username ->
@@ -117,7 +117,7 @@ lobbyUpdate msg model =
 
         StartGame ->
             ( model
-            , WebSocket.send model.wsServer "start-game"
+            , WebSocket.send model.wsServer "start"
             )
 
         GameStarted secretColor ->
@@ -143,8 +143,9 @@ arenaUpdate msg model =
         AnswerSubmitted player answer ->
             let
                 legit =
-                    List.any (\p -> p == player) model.players
-                        && not (List.member player (List.map (\( p, a ) -> p) model.answers))
+                    (&&)
+                      (model.players |> List.any ((==) player))
+                      (model.answers |> List.all (\(p,a) -> p /= player))
 
                 done =
                     legit && List.length model.players == List.length model.answers + 1
@@ -180,7 +181,7 @@ subscriptions model =
 handleSocket message =
     let
         parts =
-            List.filter (\s -> String.length s > 0) (String.split " " message)
+          String.split " " message |> List.filter (\s -> not (String.isEmpty s))
     in
     case parts of
         [ date, author, "registered" ] ->
@@ -189,7 +190,7 @@ handleSocket message =
         [ date, author, "join" ] ->
             NewPlayer author
 
-        [ date, author, "start-game", secretColor ] ->
+        [ date, author, "start", secretColor ] ->
             GameStarted secretColor
 
         [ date, author, "submit", answer ] ->
