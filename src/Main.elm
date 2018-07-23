@@ -8,16 +8,19 @@ import WebSocket
 
 type alias Model =
     { username : String
-    , players : List String
+    , players : List Player
     , stage : GameStage
     , games : List String
     , gameId : Maybe String
     , secretColor : String
     , answer : String
-    , answers : List ( String, String )
     , wsServer : String
     , error : String
     }
+
+
+type alias Player =
+    ( String, Maybe String )
 
 
 main =
@@ -37,7 +40,6 @@ init ws_server =
       , games = []
       , secretColor = ""
       , answer = ""
-      , answers = []
       , wsServer = ws_server
       , error = ""
       }
@@ -145,9 +147,9 @@ lobbyUpdate msg model =
             , WebSocket.send model.wsServer ("join " ++ gameId)
             )
 
-        ( Just gameId, NewPlayer name ) ->
+        ( Just gameId, NewPlayer username ) ->
             ( { model
-                | players = List.append model.players [ name ]
+                | players = List.append model.players [ ( username, Nothing ) ]
               }
             , Cmd.none
             )
@@ -177,19 +179,42 @@ arenaUpdate msg model =
                 Cmd.none
             )
 
-        AnswerSubmitted player answer ->
+        AnswerSubmitted username answer ->
             let
+                player =
+                    model.players
+                        |> List.filter (\( u, a ) -> u == username)
+                        |> List.head
+
                 legit =
-                    (&&)
-                        (model.players |> List.any ((==) player))
-                        (model.answers |> List.all (\( p, a ) -> p /= player))
+                    case player of
+                        Nothing ->
+                            False
+
+                        Just ( name, Just answer ) ->
+                            False
+
+                        Just ( name, Nothing ) ->
+                            True
 
                 done =
-                    legit && List.length model.players == List.length model.answers + 1
+                    legit
+                        && (model.players
+                                |> List.filter (\( u, a ) -> u /= username)
+                                |> List.all (\( u, a ) -> a /= Nothing)
+                           )
             in
             ( if legit then
                 { model
-                    | answers = List.append model.answers [ ( player, answer ) ]
+                    | players =
+                        model.players
+                            |> List.map
+                                (\( u, a ) ->
+                                    if u == username then
+                                        ( u, Just answer )
+                                    else
+                                        ( u, a )
+                                )
                     , stage =
                         if done then
                             Debrief
@@ -300,11 +325,11 @@ lobbyView model =
 
         Just gameId ->
             let
-                listItem player =
-                    li [] [ text (player ++ " is ready") ]
+                listItem ( username, answer ) =
+                    li [] [ text (username ++ " is ready") ]
 
-                notMe player =
-                    player /= model.username
+                notMe ( username, answer ) =
+                    username /= model.username
             in
             [ h3 [] [ text gameId ]
             , p [] [ text ("Signed up as " ++ model.username) ]
@@ -316,17 +341,23 @@ lobbyView model =
 arenaView : Model -> List (Html Msg)
 arenaView model =
     let
+        ( me, others ) =
+            model.players
+                |> List.partition (\( u, a ) -> u == model.username)
+
         done =
-            List.any (\( p, a ) -> p == model.username) model.answers
+            case me of
+                [ ( username, Just answer ) ] ->
+                    True
+
+                _ ->
+                    False
 
         disabled =
             if done then
                 [ attribute "disabled" "1" ]
             else
                 []
-
-        others =
-            List.map (\( p, a ) -> p) (List.filter (\( p, a ) -> p /= model.username) model.answers)
     in
     [ p [] [ text "Will you guess?" ]
     , div
@@ -335,7 +366,11 @@ arenaView model =
             , ( "height", "100px" )
             ]
         ]
-        [ ul [] (List.map (\p -> li [] [ text (p ++ " is done!") ]) others)
+        [ ul []
+            (List.map
+                (\( u, _ ) -> li [] [ text (u ++ " is done!") ])
+                (others |> List.filter (\( u, a ) -> a /= Nothing))
+            )
         ]
     , input (List.append disabled [ onInput EditAnswer, value model.answer ]) []
     ]
@@ -351,12 +386,17 @@ debriefView model =
         ]
         [ text ("The answer was #" ++ model.secretColor)
         , hr [] []
-        , ul [] (List.map showAnswer model.answers)
+        , ul [] (List.map showAnswer model.players)
         , button [ onClick LeaveGame ] [ text "Home" ]
         ]
     ]
 
 
-showAnswer ( player, answer ) =
-    li [ style [ ( "background-color", "#" ++ answer ) ] ]
-        [ text (player ++ " guessed #" ++ answer) ]
+showAnswer ( username, answer ) =
+    case answer of
+        Just colour ->
+            li [ style [ ( "background-color", "#" ++ colour ) ] ]
+                [ text (username ++ " guessed #" ++ colour) ]
+
+        Nothing ->
+            li [] [ text (username ++ " had an issue") ]
