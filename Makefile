@@ -1,6 +1,7 @@
 PATH := $(shell pwd)/node_modules/.bin:$(PATH)
+ASSETS := $(subst src/,dist/,$(shell find src/assets -type f))
 
-all: dist dist/bundle.js dist/index.html dist/debug.html node_modules
+all: dist dist/bundle.js dist/index.html dist/debug.html ${ASSETS} node_modules
 
 dist/bundle.js: src/*.elm
 	elm make src/Main.elm --output dist/bundle.js
@@ -8,8 +9,11 @@ dist/bundle.js: src/*.elm
 dist/%.html: src/%.html
 	cp $< $@
 
-dist:
-	mkdir dist
+dist/assets/%: src/assets/% dist/assets
+	cp $< $@
+
+dist dist/assets:
+	mkdir -p dist/assets
 
 node_modules: package.json
 	npm install

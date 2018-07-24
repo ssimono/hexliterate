@@ -1,6 +1,6 @@
 module Main exposing (..)
 
-import Html exposing (Html, button, div, h2, h3, hr, input, li, p, text, ul)
+import Html exposing (Html, button, div, h1, h2, h3, hr, input, li, p, span, text, ul)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import WebSocket
@@ -274,7 +274,7 @@ view model =
         content =
             case model.stage of
                 Frontdesk ->
-                    frontedeskView model
+                    frontdeskView model
 
                 Lobby ->
                     lobbyView model
@@ -291,21 +291,40 @@ view model =
             else
                 []
     in
-    div [] (List.append content error)
+    div [ class ("cont " ++ stageClass model.stage) ] (List.append content error)
 
 
-frontedeskView : Model -> List (Html Msg)
-frontedeskView model =
-    [ input [ onInput EditUsername, value model.username, placeholder "Pick a username" ] []
-    , button
-        (List.append [ onClick Register ]
-            (if String.isEmpty model.username then
-                [ attribute "disabled" "1" ]
-             else
-                []
+stageClass : GameStage -> String
+stageClass stage =
+    case stage of
+        Frontdesk ->
+            "frontdesk"
+
+        Lobby ->
+            "lobby"
+
+        Arena ->
+            "arena"
+
+        Debrief ->
+            "debrief"
+
+
+frontdeskView : Model -> List (Html Msg)
+frontdeskView model =
+    [ h1 [] [ text "Guess the Color" ]
+    , div [ class "login-form round-list" ]
+        [ input [ onInput EditUsername, value model.username, placeholder "Pick a username" ] []
+        , button
+            (List.append [ onClick Register, class "button" ]
+                (if String.isEmpty model.username then
+                    [ attribute "disabled" "1" ]
+                 else
+                    []
+                )
             )
-        )
-        [ text "Sign up" ]
+            [ text "Sign in" ]
+        ]
     ]
 
 
@@ -318,9 +337,9 @@ lobbyView model =
                     li [] [ Html.a [ href "#", onClick (JoinGame gid) ] [ text ("Join " ++ gid) ] ]
             in
             [ h2 [] [ text "Join a game" ]
-            , p [] [ button [ onClick RefreshGames ] [ text "Refresh list" ] ]
-            , ul [] (List.map gameItem model.games)
-            , p [] [ button [ onClick CreateGame ] [ text "Or create one" ] ]
+            , p [] [ button [ onClick RefreshGames, class "button" ] [ text "Refresh list" ] ]
+            , ul [ class "game-list round-list" ] (List.map gameItem model.games)
+            , p [] [ button [ onClick CreateGame, class "button" ] [ text "Or create one" ] ]
             ]
 
         Just gameId ->
@@ -328,13 +347,24 @@ lobbyView model =
                 listItem ( username, answer ) =
                     li [] [ text (username ++ " is ready") ]
 
+                playerList =
+                    ul [ class "round-list" ] (List.map listItem (List.filter notMe model.players))
+
+                alone =
+                    List.length model.players == 1
+
                 notMe ( username, answer ) =
                     username /= model.username
+
+                placeholder =
+                    p [] [ text "Let's wait for some players to join..." ]
             in
-            [ h3 [] [ text gameId ]
-            , p [] [ text ("Signed up as " ++ model.username) ]
-            , ul [] (List.map listItem (List.filter notMe model.players))
-            , button [ onClick StartGame ] [ text "Go!" ]
+            [ h2 [] [ text gameId ]
+            , if alone then
+                placeholder
+              else
+                playerList
+            , p [] [ button [ onClick StartGame, class "button" ] [ text "Go!" ] ]
             ]
 
 
@@ -359,44 +389,37 @@ arenaView model =
             else
                 []
     in
-    [ p [] [ text "Will you guess?" ]
-    , div
-        [ style
-            [ ( "background-color", "#" ++ model.secretColor )
-            , ( "height", "100px" )
-            ]
-        ]
-        [ ul []
-            (List.map
-                (\( u, _ ) -> li [] [ text (u ++ " is done!") ])
-                (others |> List.filter (\( u, a ) -> a /= Nothing))
-            )
-        ]
+    [ h2 [ class "b-w"] [ text "What color is this?" ]
+    , ul [ class "round-list"]
+          (List.map
+              (\( u, _ ) -> li [] [ text (u ++ " is done!") ])
+              (others |> List.filter (\( u, a ) -> a /= Nothing))
+          )
     , input (List.append disabled [ onInput EditAnswer, value model.answer ]) []
+    , overrideBackground model.secretColor
     ]
 
 
 debriefView : Model -> List (Html Msg)
 debriefView model =
-    [ div
-        [ style
-            [ ( "background-color", "#" ++ model.secretColor )
-            , ( "margin", "10px" )
-            ]
-        ]
-        [ text ("The answer was #" ++ model.secretColor)
-        , hr [] []
-        , ul [] (List.map showAnswer model.players)
-        , button [ onClick LeaveGame ] [ text "Home" ]
-        ]
+    [ h2 [class "b-w"] [text ("The answer was #" ++ model.secretColor)]
+    , ul [ class "round-list" ] (List.map showAnswer model.players)
+    , p [] [ button [ onClick LeaveGame, class"button" ] [ text "Home" ] ]
+    , overrideBackground model.secretColor
     ]
+
+
+overrideBackground hexcode =
+    Html.node "style" [] [ text (":root{--secret: #" ++ hexcode ++ "}") ]
 
 
 showAnswer ( username, answer ) =
     case answer of
         Just colour ->
             li [ style [ ( "background-color", "#" ++ colour ) ] ]
-                [ text (username ++ " guessed #" ++ colour) ]
+                [ span
+                  [class "b-w"]
+                  [ text (username ++ " guessed #" ++ colour) ] ]
 
         Nothing ->
             li [] [ text (username ++ " had an issue") ]

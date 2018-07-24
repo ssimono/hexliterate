@@ -1,0 +1,71 @@
+body {
+  background-color: var(--secret, lightslategrey);
+  font-family: Verdana, sans-serif;
+  margin: 0;
+}
+
+h1, h2 {
+  color: whitesmoke;
+  text-align: center;
+}
+
+p {
+  text-align: center;
+}
+
+.error {
+  color: gold;
+}
+
+.cont {
+  padding: var(--outer-padding);
+}
+
+.button {
+  background-color: var(--dark-1);
+  border: 0;
+  border-radius: var(--brd-radius);
+  color: var(--light-1);
+  height: var(--list-item-height);
+  min-width: 5rem;
+}
+
+.button:hover {
+  background-color: auto;
+}
+
+.round-list {
+  list-style-type: none;
+  padding: 0;
+}
+
+.round-list li, .round-list ol {
+  background-color: var(--light-2);
+  border-bottom: 1px solid var(--dark-2);
+  height: var(--list-item-height);
+  line-height: var(--list-item-height);
+  padding: 0 1.5rem;
+}
+
+.round-list > :first-child {
+  border-top-left-radius: var(--brd-radius);
+  border-top-right-radius: var(--brd-radius);
+}
+
+.round-list > :last-child {
+  border-bottom: none;
+  border-bottom-left-radius: var(--brd-radius);
+  border-bottom-right-radius: var(--brd-radius);
+}
+
+.b-w {
+  background-color: #000;
+  border-radius: 5px;
+  color: #ddd;
+  padding: 3px 1rem;
+}
+
+span.b-w {
+  background-color: rgba(0,0,0,0.5);
+  border: none;
+}

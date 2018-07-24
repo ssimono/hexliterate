@@ -1,0 +1,21 @@
+.login-form > * {
+  margin: 0;
+  width: 100%;
+}
+
+.login-form button {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.login-form input {
+  border: 0;
+  height: var(--list-item-height);
+  padding: 0;
+  text-align: center;
+}
+
+.game-list a {
+  color: var(--dark-1);
+  text-decoration: none;
+}
