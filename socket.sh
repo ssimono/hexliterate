@@ -36,6 +36,7 @@ do
     game=$(mktemp "$GAME_FOLDER/XXXX.log")
     line="$line $(basename -s .log $game)"
     echo "`date -Ins` $username $line"
+    continue
     ;;
   "join")
     hash=$(echo $line | cut -d ' ' -f 2)
@@ -43,6 +44,7 @@ do
     game="$GAME_FOLDER/$hash.log"
     tail -f -n 0 --pid=$$ $game & watch_pid=$!
     cat $game
+    sleep 2
     ;;
   "leave")
     kill $watch_pid 2>/dev/null

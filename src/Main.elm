@@ -131,9 +131,6 @@ frontdeskUpdate msg model =
 lobbyUpdate : Msg -> Model -> ( Model, Cmd Msg )
 lobbyUpdate msg model =
     case ( model.gameId, msg ) of
-        ( Nothing, RefreshGames ) ->
-            ( model, WebSocket.send model.wsServer "list" )
-
         ( Nothing, ListReceived games ) ->
             ( { model | games = games }, Cmd.none )
 
@@ -147,13 +144,6 @@ lobbyUpdate msg model =
             , WebSocket.send model.wsServer ("join " ++ gameId)
             )
 
-        ( Just gameId, NewPlayer username ) ->
-            ( { model
-                | players = List.append model.players [ ( username, Nothing ) ]
-              }
-            , Cmd.none
-            )
-
         ( Just gameId, StartGame ) ->
             ( model
             , WebSocket.send model.wsServer "start"
@@ -163,6 +153,16 @@ lobbyUpdate msg model =
             ( { model | stage = Arena, secretColor = secretColor }
             , Cmd.none
             )
+
+        ( Just gameId, NewPlayer username ) ->
+            ( { model
+                | players = List.append model.players [ ( username, Nothing ) ]
+              }
+            , Cmd.none
+            )
+
+        ( _, RefreshGames ) ->
+            ( model, WebSocket.send model.wsServer "list" )
 
         _ ->
             ( model, Cmd.none )
@@ -256,7 +256,7 @@ handleSocket message =
             NewPlayer author
 
         [ date, author, "create", gameId ] ->
-            JoinGame gameId
+            RefreshGames
 
         [ date, author, "start", secretColor ] ->
             GameStarted secretColor
