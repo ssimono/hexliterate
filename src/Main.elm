@@ -1,6 +1,8 @@
 module Main exposing (..)
 
-import Html exposing (Html, button, div, h1, h2, h3, hr, input, li, p, span, text, ul)
+import Html as H
+import List as L
+import String as S
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import WebSocket
@@ -24,7 +26,7 @@ type alias Player =
 
 
 main =
-    Html.programWithFlags
+    H.programWithFlags
         { init = init
         , view = view
         , update = update
@@ -156,7 +158,7 @@ lobbyUpdate msg model =
 
         ( Just gameId, NewPlayer username ) ->
             ( { model
-                | players = List.append model.players [ ( username, Nothing ) ]
+                | players = L.append model.players [ ( username, Nothing ) ]
               }
             , Cmd.none
             )
@@ -173,7 +175,7 @@ arenaUpdate msg model =
     case msg of
         EditAnswer answer ->
             ( { model | answer = answer }
-            , if String.length answer == 6 then
+            , if S.length answer == 6 then
                 WebSocket.send model.wsServer ("submit " ++ answer)
               else
                 Cmd.none
@@ -183,8 +185,8 @@ arenaUpdate msg model =
             let
                 player =
                     model.players
-                        |> List.filter (\( u, a ) -> u == username)
-                        |> List.head
+                        |> L.filter (\( u, a ) -> u == username)
+                        |> L.head
 
                 legit =
                     case player of
@@ -200,15 +202,15 @@ arenaUpdate msg model =
                 done =
                     legit
                         && (model.players
-                                |> List.filter (\( u, a ) -> u /= username)
-                                |> List.all (\( u, a ) -> a /= Nothing)
+                                |> L.filter (\( u, a ) -> u /= username)
+                                |> L.all (\( u, a ) -> a /= Nothing)
                            )
             in
             ( if legit then
                 { model
                     | players =
                         model.players
-                            |> List.map
+                            |> L.map
                                 (\( u, a ) ->
                                     if u == username then
                                         ( u, Just answer )
@@ -243,14 +245,14 @@ subscriptions model =
 handleSocket message =
     let
         parts =
-            String.split " " message |> List.filter (\s -> not (String.isEmpty s))
+            S.split " " message |> L.filter (\s -> not (S.isEmpty s))
     in
     case parts of
         [ date, author, "registered" ] ->
             Registered author
 
         date :: author :: "list" :: games ->
-            ListReceived (games |> String.join "" |> String.split ",")
+            ListReceived (games |> S.join "" |> S.split ",")
 
         [ date, author, "join", gameId ] ->
             NewPlayer author
@@ -268,7 +270,7 @@ handleSocket message =
             Error ("Bad message format: " ++ message)
 
 
-view : Model -> Html Msg
+view : Model -> H.Html Msg
 view model =
     let
         content =
@@ -286,12 +288,12 @@ view model =
                     debriefView model
 
         error =
-            if not (String.isEmpty model.error) then
-                [ p [ class "error" ] [ text model.error ] ]
+            if not (S.isEmpty model.error) then
+                [ H.p [ class "error" ] [ H.text model.error ] ]
             else
                 []
     in
-    div [ class ("cont " ++ stageClass model.stage) ] (List.append content error)
+    H.div [ class ("cont " ++ stageClass model.stage) ] (L.append content error)
 
 
 stageClass : GameStage -> String
@@ -310,70 +312,70 @@ stageClass stage =
             "debrief"
 
 
-frontdeskView : Model -> List (Html Msg)
+frontdeskView : Model -> List (H.Html Msg)
 frontdeskView model =
-    [ h1 [] [ text "Guess the Color" ]
-    , div [ class "login-form round-list" ]
-        [ input [ onInput EditUsername, value model.username, placeholder "Pick a username" ] []
-        , button
-            (List.append [ onClick Register, class "button" ]
-                (if String.isEmpty model.username then
+    [ H.h1 [] [ H.text "Guess the Color" ]
+    , H.div [ class "login-form round-list" ]
+        [ H.input [ onInput EditUsername, value model.username, placeholder "Pick a username" ] []
+        , H.button
+            (L.append [ onClick Register, class "button" ]
+                (if S.isEmpty model.username then
                     [ attribute "disabled" "1" ]
                  else
                     []
                 )
             )
-            [ text "Sign in" ]
+            [ H.text "Sign in" ]
         ]
     ]
 
 
-lobbyView : Model -> List (Html Msg)
+lobbyView : Model -> List (H.Html Msg)
 lobbyView model =
     case model.gameId of
         Nothing ->
             let
                 gameItem gid =
-                    li [] [ Html.a [ href "#", onClick (JoinGame gid) ] [ text ("Join " ++ gid) ] ]
+                    H.li [] [ H.a [ href "#", onClick (JoinGame gid) ] [ H.text ("Join " ++ gid) ] ]
             in
-            [ h2 [] [ text "Join a game" ]
-            , p [] [ button [ onClick RefreshGames, class "button" ] [ text "Refresh list" ] ]
-            , ul [ class "game-list round-list" ] (List.map gameItem model.games)
-            , p [] [ button [ onClick CreateGame, class "button" ] [ text "Or create one" ] ]
+            [ H.h2 [] [ H.text "Join a game" ]
+            , H.p [] [ H.button [ onClick RefreshGames, class "button" ] [ H.text "Refresh list" ] ]
+            , H.ul [ class "game-list round-list" ] (L.map gameItem model.games)
+            , H.p [] [ H.button [ onClick CreateGame, class "button" ] [ H.text "Or create one" ] ]
             ]
 
         Just gameId ->
             let
                 listItem ( username, answer ) =
-                    li [] [ text (username ++ " is ready") ]
+                    H.li [] [ H.text (username ++ " is ready") ]
 
                 playerList =
-                    ul [ class "round-list" ] (List.map listItem (List.filter notMe model.players))
+                    H.ul [ class "round-list" ] (L.map listItem (L.filter notMe model.players))
 
                 alone =
-                    List.length model.players == 1
+                    L.length model.players == 1
 
                 notMe ( username, answer ) =
                     username /= model.username
 
                 placeholder =
-                    p [] [ text "Let's wait for some players to join..." ]
+                    H.p [] [ H.text "Let's wait for some players to join..." ]
             in
-            [ h2 [] [ text gameId ]
+            [ H.h2 [] [ H.text gameId ]
             , if alone then
                 placeholder
               else
                 playerList
-            , p [] [ button [ onClick StartGame, class "button" ] [ text "Go!" ] ]
+            , H.p [] [ H.button [ onClick StartGame, class "button" ] [ H.text "Go!" ] ]
             ]
 
 
-arenaView : Model -> List (Html Msg)
+arenaView : Model -> List (H.Html Msg)
 arenaView model =
     let
         ( me, others ) =
             model.players
-                |> List.partition (\( u, a ) -> u == model.username)
+                |> L.partition (\( u, a ) -> u == model.username)
 
         done =
             case me of
@@ -389,37 +391,37 @@ arenaView model =
             else
                 []
     in
-    [ h2 [ class "b-w"] [ text "What color is this?" ]
-    , ul [ class "round-list"]
-          (List.map
-              (\( u, _ ) -> li [] [ text (u ++ " is done!") ])
-              (others |> List.filter (\( u, a ) -> a /= Nothing))
+    [ H.h2 [ class "b-w"] [ H.text "What color is this?" ]
+    , H.ul [ class "round-list"]
+          (L.map
+              (\( u, _ ) -> H.li [] [ H.text (u ++ " is done!") ])
+              (others |> L.filter (\( u, a ) -> a /= Nothing))
           )
-    , input (List.append disabled [ onInput EditAnswer, value model.answer ]) []
+    , H.input (L.append disabled [ onInput EditAnswer, value model.answer ]) []
     , overrideBackground model.secretColor
     ]
 
 
-debriefView : Model -> List (Html Msg)
+debriefView : Model -> List (H.Html Msg)
 debriefView model =
-    [ h2 [class "b-w"] [text ("The answer was #" ++ model.secretColor)]
-    , ul [ class "round-list" ] (List.map showAnswer model.players)
-    , p [] [ button [ onClick LeaveGame, class"button" ] [ text "Home" ] ]
+    [ H.h2 [class "b-w"] [H.text ("The answer was #" ++ model.secretColor)]
+    , H.ul [ class "round-list" ] (L.map showAnswer model.players)
+    , H.p [] [ H.button [ onClick LeaveGame, class"button" ] [ H.text "Home" ] ]
     , overrideBackground model.secretColor
     ]
 
 
 overrideBackground hexcode =
-    Html.node "style" [] [ text (":root{--secret: #" ++ hexcode ++ "}") ]
+    H.node "style" [] [ H.text (":root{--secret: #" ++ hexcode ++ "}") ]
 
 
 showAnswer ( username, answer ) =
     case answer of
         Just colour ->
-            li [ style [ ( "background-color", "#" ++ colour ) ] ]
-                [ span
+            H.li [ style [ ( "background-color", "#" ++ colour ) ] ]
+                [ H.span
                   [class "b-w"]
-                  [ text (username ++ " guessed #" ++ colour) ] ]
+                  [ H.text (username ++ " guessed #" ++ colour) ] ]
 
         Nothing ->
-            li [] [ text (username ++ " had an issue") ]
+            H.li [] [ H.text (username ++ " had an issue") ]
