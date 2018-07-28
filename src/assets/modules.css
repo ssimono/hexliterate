@@ -19,3 +19,7 @@
   color: var(--dark-1);
   text-decoration: none;
 }
+
+.arena h3 {
+  letter-spacing: 5px;
+}

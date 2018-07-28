@@ -1,10 +1,11 @@
 module Main exposing (..)
 
 import Html as H
-import List as L
-import String as S
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
+import List as L
+import Regex exposing (contains, regex)
+import String as S
 import WebSocket
 
 
@@ -174,7 +175,13 @@ arenaUpdate : Msg -> Model -> ( Model, Cmd Msg )
 arenaUpdate msg model =
     case msg of
         EditAnswer answer ->
-            ( { model | answer = answer }
+            ( { model
+                | answer =
+                    if Regex.contains (regex "^[a-fA-F0-9]+$") answer then
+                        answer
+                    else
+                        model.answer
+              }
             , if S.length answer == 6 then
                 WebSocket.send model.wsServer ("submit " ++ answer)
               else
@@ -390,23 +397,35 @@ arenaView model =
                 [ attribute "disabled" "1" ]
             else
                 []
+
+        currentAnswer =
+            "#" ++ model.answer ++ S.repeat (6 - S.length model.answer) "_"
     in
-    [ H.h2 [ class "b-w"] [ H.text "What color is this?" ]
-    , H.ul [ class "round-list"]
-          (L.map
-              (\( u, _ ) -> H.li [] [ H.text (u ++ " is done!") ])
-              (others |> L.filter (\( u, a ) -> a /= Nothing))
-          )
-    , H.input (L.append disabled [ onInput EditAnswer, value model.answer ]) []
+    [ H.h2 [ class "b-w" ] [ H.text "What color is this?" ]
+    , H.h3 [ class "b-w" ] [ H.text currentAnswer ]
+    , H.p []
+        [ H.input
+            (L.append disabled
+                [ onInput EditAnswer
+                , value model.answer
+                ]
+            )
+            []
+        ]
+    , H.ul [ class "round-list" ]
+        (L.map
+            (\( u, _ ) -> H.li [] [ H.text (u ++ " is done!") ])
+            (others |> L.filter (\( u, a ) -> a /= Nothing))
+        )
     , overrideBackground model.secretColor
     ]
 
 
 debriefView : Model -> List (H.Html Msg)
 debriefView model =
-    [ H.h2 [class "b-w"] [H.text ("The answer was #" ++ model.secretColor)]
+    [ H.h2 [ class "b-w" ] [ H.text ("The answer was #" ++ model.secretColor) ]
     , H.ul [ class "round-list" ] (L.map showAnswer model.players)
-    , H.p [] [ H.button [ onClick LeaveGame, class"button" ] [ H.text "Home" ] ]
+    , H.p [] [ H.button [ onClick LeaveGame, class "button" ] [ H.text "Home" ] ]
     , overrideBackground model.secretColor
     ]
 
@@ -418,10 +437,11 @@ overrideBackground hexcode =
 showAnswer ( username, answer ) =
     case answer of
         Just colour ->
-            H.li [ style [ ( "background-color", "#" ++ colour ) ] ]
+            H.li [ style [ ( "background-color", "#" ++ colour ) ], class "b-w" ]
                 [ H.span
-                  [class "b-w"]
-                  [ H.text (username ++ " guessed #" ++ colour) ] ]
+                    []
+                    [ H.text (username ++ " guessed #" ++ colour) ]
+                ]
 
         Nothing ->
             H.li [] [ H.text (username ++ " had an issue") ]
