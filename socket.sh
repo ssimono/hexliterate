@@ -29,7 +29,7 @@ do
     ;;
   "list")
     echo -n "`date -Ins` $username $line "
-    ls -m "$GAME_FOLDER" | sed 's/\.log//g'
+    ls -mt "$GAME_FOLDER" | sed 's/\.log//g'
     continue
     ;;
   "create")

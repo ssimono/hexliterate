@@ -11,9 +11,8 @@
     <div id="main"></div>
     <script src="bundle.js"></script>
     <script>
-      const app = Elm.Main.embed(
-        document.getElementById('main'),
-        'ws://localhost:8000'
+      Elm.Main.fullscreen(
+        document.location.href.replace(/^http/, 'ws')
       )
     </script>
   </body>
