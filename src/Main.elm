@@ -1,11 +1,13 @@
 module Main exposing (..)
 
+import Dom exposing (focus)
 import Html as H
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import List as L
 import Regex exposing (contains, regex)
 import String as S
+import Task exposing (attempt)
 import WebSocket
 
 
@@ -154,7 +156,7 @@ lobbyUpdate msg model =
 
         ( Just gameId, GameStarted secretColor ) ->
             ( { model | stage = Arena, secretColor = secretColor }
-            , Cmd.none
+            , Dom.focus "color-input" |> Task.attempt (\_ -> NoOp)
             )
 
         ( Just gameId, NewPlayer username ) ->
@@ -408,6 +410,7 @@ arenaView model =
             (L.append disabled
                 [ onInput EditAnswer
                 , value model.answer
+                , id "color-input"
                 ]
             )
             []

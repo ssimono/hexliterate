@@ -5,7 +5,7 @@ game=''
 watch_pid=''
 
 validate='
-/^register [a-zA-Z0-9_\-]\{1,\}$/p;
+/^register [[:alnum:]_]\{1,\}$/p;
 /^list$/p;
 /^create$/p;
 /^join [a-zA-Z0-9]\{4\}$/p;
