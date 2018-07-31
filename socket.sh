@@ -5,31 +5,31 @@ game=''
 watch_pid=''
 
 validate='
-/^register [[:alnum:]_]\{1,\}$/p;
+/^register \S+$/p;
 /^list$/p;
 /^create$/p;
-/^join [a-zA-Z0-9]\{4\}$/p;
+/^join \w{4}$/p;
 /^leave$/p;
 /^start$/p;
-/^submit [a-fA-F0-9]\{6\}$/p;
+/^submit [a-fA-F0-9]{6}$/p;
 '
 
 while read line
 do
-  cmd=$(echo "$line" | sed -n "$validate" | cut -d ' ' -f 1)
+  cmd=$(echo "$line" | sed -rn "$validate" | cut -d ' ' -f 1)
   case $cmd in
+    "")
+    echo "`date -Ins` $username bad-message $line"
+    continue
+    ;;
   "register")
     username=$(echo $line | cut -d ' ' -f 2)
     echo "`date -Ins` $username registered"
     continue
     ;;
-  "")
-    echo "`date -Ins` $username bad-message: $line"
-    continue
-    ;;
   "list")
-    echo -n "`date -Ins` $username $line "
-    ls -mt "$GAME_FOLDER" | sed 's/\.log//g'
+    prefix="`date -Ins` $username gameitem"
+    ls -rt "$GAME_FOLDER" | sed "s/^/$prefix /;s/\.log//g"
     continue
     ;;
   "create")

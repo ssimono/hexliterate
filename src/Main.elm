@@ -4,6 +4,7 @@ import Dom exposing (focus)
 import Html as H
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
+import Html.Keyed as HKeyed
 import List as L
 import Regex exposing (contains, regex)
 import String as S
@@ -64,7 +65,7 @@ type Msg
     | Register
     | Registered String
     | RefreshGames
-    | ListReceived (List String)
+    | GameReceived String
     | CreateGame
     | JoinGame String
     | LeaveGame
@@ -78,7 +79,11 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update msg previousModel =
+    let
+        model =
+            { previousModel | error = "" }
+    in
     case msg of
         Error message ->
             ( { model | error = message }, Cmd.none )
@@ -136,8 +141,8 @@ frontdeskUpdate msg model =
 lobbyUpdate : Msg -> Model -> ( Model, Cmd Msg )
 lobbyUpdate msg model =
     case ( model.gameId, msg ) of
-        ( Nothing, ListReceived games ) ->
-            ( { model | games = games }, Cmd.none )
+        ( Nothing, GameReceived game ) ->
+            ( { model | games = game :: model.games }, Cmd.none )
 
         ( Nothing, CreateGame ) ->
             ( model
@@ -167,7 +172,7 @@ lobbyUpdate msg model =
             )
 
         ( _, RefreshGames ) ->
-            ( model, WebSocket.send model.wsServer "list" )
+            ( { model | games = [] }, WebSocket.send model.wsServer "list" )
 
         _ ->
             ( model, Cmd.none )
@@ -179,7 +184,7 @@ arenaUpdate msg model =
         EditAnswer answer ->
             ( { model
                 | answer =
-                    if Regex.contains (regex "^[a-fA-F0-9]+$") answer then
+                    if Regex.contains (regex "^[a-fA-F0-9]{0,6}$") answer then
                         answer
                     else
                         model.answer
@@ -260,8 +265,8 @@ handleSocket message =
         [ date, author, "registered" ] ->
             Registered author
 
-        date :: author :: "list" :: games ->
-            ListReceived (games |> S.join "" |> S.split ",")
+        [ date, author, "gameitem", gameId ] ->
+            GameReceived gameId
 
         [ date, author, "join", gameId ] ->
             NewPlayer author
@@ -274,6 +279,9 @@ handleSocket message =
 
         [ date, author, "submit", answer ] ->
             AnswerSubmitted author answer
+
+        date::author::"bad-message"::details ->
+            Error ("Bad message: " ++ (S.join " " details))
 
         _ ->
             Error ("Bad message format: " ++ message)
@@ -345,11 +353,13 @@ lobbyView model =
         Nothing ->
             let
                 gameItem gid =
-                    H.li [] [ H.a [ href "#", onClick (JoinGame gid) ] [ H.text ("Join " ++ gid) ] ]
+                    ( gid
+                    , H.li [] [ H.a [ href "#", onClick (JoinGame gid) ] [ H.text ("Join " ++ gid) ] ]
+                    )
             in
             [ H.h2 [] [ H.text "Join a game" ]
             , H.p [] [ H.button [ onClick RefreshGames, class "button" ] [ H.text "Refresh list" ] ]
-            , H.ul [ class "game-list round-list" ] (L.map gameItem model.games)
+            , HKeyed.ul [ class "game-list round-list" ] (L.map gameItem model.games)
             , H.p [] [ H.button [ onClick CreateGame, class "button" ] [ H.text "Or create one" ] ]
             ]
 

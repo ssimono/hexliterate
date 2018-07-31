@@ -1,7 +1,9 @@
 {
-  "name": "colorcode",
+  "name": "Hexliterate",
   "version": "0.0.1",
   "description": "Fun game about guessing color code",
+  "repository": "https://github.com/user/project.git",
+  "license": "MIT",
   "scripts": {
     "elm": "elm",
     "build": "elm make src/Main.elm --output dist/bundle.js"
