@@ -1,5 +1,7 @@
 module Models exposing (..)
 
+import Color exposing (Color)
+
 
 type alias Model =
     { username : String
@@ -7,15 +9,19 @@ type alias Model =
     , stage : GameStage
     , games : List String
     , gameId : Maybe String
-    , secretColor : String
+    , secretColor : Color
     , answer : String
     , wsServer : String
     , error : String
     }
 
 
+type alias Guess =
+    Maybe (Result String Color)
+
+
 type alias Player =
-    ( String, Maybe String )
+    ( String, Guess )
 
 
 type GameStage
@@ -37,7 +43,7 @@ type Msg
     | NewPlayer String
     | Error String
     | StartGame
-    | GameStarted String
+    | GameStarted Color
     | EditAnswer String
     | AnswerSubmitted String String
     | NoOp

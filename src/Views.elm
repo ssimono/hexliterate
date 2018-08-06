@@ -1,5 +1,6 @@
 module Views exposing (view)
 
+import ColorUtils as Cu
 import Html as H
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
@@ -152,16 +153,23 @@ arenaView model =
             (\( u, _ ) -> H.li [] [ H.text (u ++ " is done!") ])
             (others |> L.filter (\( u, a ) -> a /= Nothing))
         )
-    , overrideBackground model.secretColor
+    , overrideBackground (Cu.col2hex model.secretColor)
     ]
 
 
 debriefView : Model -> List (H.Html Msg)
 debriefView model =
-    [ H.h2 [ class "b-w" ] [ H.text ("The answer was #" ++ model.secretColor) ]
-    , H.ul [ class "round-list" ] (L.map showAnswer model.players)
+    let
+        secretHex =
+            Cu.col2hex model.secretColor
+
+        sortedPlayers =
+            L.sortBy (\p -> -1 * Cu.accuracy model.secretColor p) model.players
+    in
+    [ H.h2 [ class "b-w" ] [ H.text ("The answer was #" ++ secretHex) ]
+    , H.ol [ class "round-list" ] (L.map showAnswer sortedPlayers)
     , H.p [] [ H.button [ onClick LeaveGame, class "button" ] [ H.text "Home" ] ]
-    , overrideBackground model.secretColor
+    , overrideBackground secretHex
     ]
 
 
@@ -169,14 +177,22 @@ overrideBackground hexcode =
     H.node "style" [] [ H.text (":root{--secret: #" ++ hexcode ++ "}") ]
 
 
+showAnswer : Player -> H.Html Msg
 showAnswer ( username, answer ) =
     case answer of
-        Just colour ->
-            H.li [ style [ ( "background-color", "#" ++ colour ) ], class "b-w" ]
+        Just (Ok color) ->
+            H.li [ style [ ( "background-color", "#" ++ Cu.col2hex color ) ], class "b-w" ]
                 [ H.span
                     []
-                    [ H.text (username ++ " guessed #" ++ colour) ]
+                    [ H.text (username ++ " guessed #" ++ Cu.col2hex color) ]
+                ]
+
+        Just (Err problem) ->
+            H.li []
+                [ H.span
+                    []
+                    [ H.text (username ++ " had a problem") ]
                 ]
 
         Nothing ->
-            H.li [] [ H.text (username ++ " had an issue") ]
+            H.li [] [ H.text (username ++ " didn't answer!") ]

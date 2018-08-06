@@ -1,10 +1,12 @@
 module Main exposing (..)
 
+import Color exposing (Color)
 import Dom exposing (focus)
 import Html
 import List as L
 import Models exposing (..)
 import Regex exposing (contains, regex)
+import Result
 import String as S
 import Task exposing (attempt)
 import Views exposing (view)
@@ -26,7 +28,7 @@ init ws_server =
       , stage = Frontdesk
       , gameId = Nothing
       , games = []
-      , secretColor = ""
+      , secretColor = Color.white
       , answer = ""
       , wsServer = ws_server
       , error = ""
@@ -164,10 +166,7 @@ arenaUpdate msg model =
                         Nothing ->
                             False
 
-                        Just ( name, Just answer ) ->
-                            False
-
-                        Just ( name, Nothing ) ->
+                        Just ( name, answer ) ->
                             True
 
                 done =
@@ -184,7 +183,7 @@ arenaUpdate msg model =
                             |> L.map
                                 (\( u, a ) ->
                                     if u == username then
-                                        ( u, Just answer )
+                                        ( u, Just (parseAnswer answer) )
                                     else
                                         ( u, a )
                                 )
@@ -231,8 +230,13 @@ handleSocket message =
         [ date, author, "create", gameId ] ->
             RefreshGames
 
-        [ date, author, "start", secretColor ] ->
-            GameStarted secretColor
+        [ date, author, "start", secretHex ] ->
+            case parseAnswer secretHex of
+                Ok color ->
+                    GameStarted color
+
+                Err problem ->
+                    Error ("Bad color: " ++ problem)
 
         [ date, author, "submit", answer ] ->
             AnswerSubmitted author answer
@@ -242,3 +246,29 @@ handleSocket message =
 
         _ ->
             Error ("Bad message format: " ++ message)
+
+
+parseAnswer : String -> Result String Color
+parseAnswer answer =
+    let
+        red =
+            S.slice 0 2 answer
+
+        green =
+            S.slice 2 4 answer
+
+        blue =
+            S.slice 4 6 answer
+
+        hextoint hex =
+            S.toInt ("0x" ++ hex)
+
+        parsedColors =
+            L.map hextoint [ red, green, blue ]
+    in
+    case parsedColors of
+        [ Result.Ok r, Result.Ok g, Result.Ok b ] ->
+            Color.rgb r g b |> Result.Ok
+
+        _ ->
+            Result.Err "Invalid hex color"
