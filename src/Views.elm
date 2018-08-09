@@ -77,7 +77,7 @@ lobbyView model =
             let
                 gameItem gid =
                     ( gid
-                    , H.li [] [ H.a [ href "#", onClick (JoinGame gid) ] [ H.text ("Join " ++ gid) ] ]
+                    , H.li [ onClick (JoinGame gid) ] [ H.text ("Join " ++ gid) ]
                     )
             in
             [ H.h2 [] [ H.text "Join a game" ]
