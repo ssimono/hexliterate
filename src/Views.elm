@@ -148,7 +148,7 @@ arenaView model =
             )
             []
         ]
-    , H.ul [ class "round-list" ]
+    , H.ul [ class "b-w news" ]
         (L.map
             (\( u, _ ) -> H.li [] [ H.text (u ++ " is done!") ])
             (others |> L.filter (\( u, a ) -> a /= Nothing))

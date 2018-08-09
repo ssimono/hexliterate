@@ -26,7 +26,7 @@ p {
   border: 0;
   border-radius: var(--brd-radius);
   color: var(--light-1);
-  height: var(--list-item-height);
+  height: var(--item-height);
   min-width: 5rem;
 }
 
@@ -39,12 +39,10 @@ p {
   padding: 0;
 }
 
-.round-list li, .round-list ol {
+.round-list li {
   background-color: var(--light-2);
   border-bottom: 1px solid var(--dark-2);
-  height: var(--list-item-height);
-  line-height: var(--list-item-height);
-  padding: 0 1.5rem;
+  padding: 10px 1.5rem;
 }
 
 .round-list > :first-child {

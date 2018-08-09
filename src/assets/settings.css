@@ -2,7 +2,7 @@
   /* dimensions */
   --brd-radius: 8px;
   --outer-padding: 15px;
-  --list-item-height: 50px;
+  --item-height: 50px;
 
   /* colors*/
   --light-1: #eee;

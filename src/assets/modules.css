@@ -10,7 +10,7 @@
 
 .login-form input {
   border: 0;
-  height: var(--list-item-height);
+  height: var(--item-height);
   padding: 0;
   text-align: center;
 }
@@ -22,4 +22,20 @@
 
 .arena h3 {
   letter-spacing: 5px;
+}
+
+.arena ul.news {
+  list-style-type: none;
+  padding: 0;
+  text-align: center;
+}
+
+.debrief ol li {
+  border: none;
+  padding-bottom: 15px;
+  padding-top: 15px;
+}
+
+.debrief ol li:last-child, .debrief li:first-child {
+  border-bottom: none;
 }
