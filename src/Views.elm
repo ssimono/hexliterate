@@ -147,6 +147,10 @@ arenaView model =
                 ]
             )
             []
+        , if done then
+            H.p [ class "b-w" ] [ H.text "Good job! Let's wait for the others" ]
+          else
+            H.text ""
         ]
     , H.ul [ class "b-w news" ]
         (L.map
