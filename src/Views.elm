@@ -149,6 +149,8 @@ arenaView model =
             []
         , if done then
             H.p [ class "b-w" ] [ H.text "Good job! Let's wait for the others" ]
+          else if model.countdown <= 5 then
+            H.p [ class "b-w" ] [ H.text ("Game ends in " ++ toString model.countdown) ]
           else
             H.text ""
         ]

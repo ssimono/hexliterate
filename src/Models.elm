@@ -10,6 +10,7 @@ type alias Model =
     , games : List String
     , gameId : Maybe String
     , secretColor : Color
+    , countdown : Int
     , answer : String
     , wsServer : String
     , error : String
@@ -44,6 +45,7 @@ type Msg
     | Error String
     | StartGame
     | GameStarted Color
+    | Countdown Int
     | EditAnswer String
     | AnswerSubmitted String String
     | NoOp

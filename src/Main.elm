@@ -29,6 +29,7 @@ init ws_server =
       , gameId = Nothing
       , games = []
       , secretColor = Color.white
+      , countdown = 0
       , answer = ""
       , wsServer = ws_server
       , error = ""
@@ -119,7 +120,7 @@ lobbyUpdate msg model =
             )
 
         ( Just gameId, GameStarted secretColor ) ->
-            ( { model | stage = Arena, secretColor = secretColor }
+            ( { model | stage = Arena, secretColor = secretColor, countdown = 20 }
             , Dom.focus "color-input" |> Task.attempt (\_ -> NoOp)
             )
 
@@ -198,6 +199,18 @@ arenaUpdate msg model =
             , Cmd.none
             )
 
+        Countdown counter ->
+            ( { model
+                | countdown = counter
+                , stage =
+                    if counter == 0 then
+                        Debrief
+                    else
+                        model.stage
+              }
+            , Cmd.none
+            )
+
         _ ->
             ( model, Cmd.none )
 
@@ -240,6 +253,14 @@ handleSocket message =
 
         [ date, author, "submit", answer ] ->
             AnswerSubmitted author answer
+
+        [ date, "countdown", sCounter ] ->
+            case S.toInt sCounter of
+                Ok counter ->
+                    Countdown counter
+
+                Err problem ->
+                    Error ("Bad Countdown: " ++ problem)
 
         date :: author :: "bad-message" :: details ->
             Error ("Bad message: " ++ S.join " " details)

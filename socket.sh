@@ -3,6 +3,7 @@
 username="anonymous"
 game=''
 watch_pid=''
+count_cmd=$(PATH=$PWD:$PATH which counter.sh)
 
 validate='
 /^register \S+$/p;
@@ -30,6 +31,7 @@ do
   "list")
     prefix="`date -Ins` $username gameitem"
     ls -rt "$GAME_FOLDER" | sed "s/^/$prefix /;s/\.log//g"
+    game=''
     continue
     ;;
   "create")
@@ -39,12 +41,17 @@ do
     continue
     ;;
   "join")
-    hash=$(echo $line | cut -d ' ' -f 2)
-    kill $watch_pid 2>/dev/null
-    game="$GAME_FOLDER/$hash.log"
-    tail -f -n 0 --pid=$$ $game & watch_pid=$!
-    cat $game
-    sleep 2
+    if [ -w $game ]; then
+      kill $watch_pid 2>/dev/null
+      hash=$(echo $line | cut -d ' ' -f 2)
+      game="$GAME_FOLDER/$hash.log"
+      tail -f -n 0 --pid=$$ $game & watch_pid=$!
+      cat $game
+      sleep 0.5
+    else
+      cat $game
+      continue
+    fi
     ;;
   "leave")
     kill $watch_pid 2>/dev/null
@@ -52,6 +59,7 @@ do
     ;;
   "start")
     line="$line `head -c 100 /dev/urandom | sha1sum -b | head -c 6`"
+    `$count_cmd $game` &
     ;;
   esac
 

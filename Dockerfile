@@ -20,7 +20,7 @@ ENV WSD_PASSENV=GAME_FOLDER
 ENV GAME_FOLDER=/var/data/
 
 COPY --from=golang ["/go/bin/websocketd", "/usr/bin/"]
-ADD ["./socket.sh", "./parsenv.sh", "/usr/bin/"]
+ADD ["./socket.sh", "./parsenv.sh", "./counter.sh", "/usr/bin/"]
 COPY --from=node ["/app/dist", "/var/www"]
 
 VOLUME ["/var/data/"]
