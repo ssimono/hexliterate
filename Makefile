@@ -27,5 +27,5 @@ up:
 .PHONY: up
 
 format:
-	elm format src/*.elm
+	elm format --yes src/*.elm
 .PHONY: format

@@ -169,11 +169,42 @@ debriefView model =
         secretHex =
             Cu.col2hex model.secretColor
 
+        parsePlayer ( username, answer ) ( valid, invalid ) =
+            case answer of
+                Just (Ok color) ->
+                    ( ( username, color ) :: valid
+                    , invalid
+                    )
+
+                Just (Err problem) ->
+                    ( valid
+                    , (username ++ " had a problem") :: invalid
+                    )
+
+                Nothing ->
+                    ( valid
+                    , (username ++ " had no idea") :: invalid
+                    )
+
+        ( validPlayers, invalidPlayers ) =
+            List.foldr parsePlayer ( [], [] ) model.players
+
         sortedPlayers =
-            L.sortBy (\p -> -1 * Cu.accuracy model.secretColor p) model.players
+            L.sortBy (\( u, c ) -> -1 * Cu.accuracy model.secretColor c) validPlayers
+
+        validItem rank ( username, color ) =
+            H.li [ style [ ( "background-color", "#" ++ Cu.col2hex color ) ], class "b-w" ]
+                [ H.span
+                    []
+                    [ H.text ((rank + 1 |> toString) ++ ". " ++ username ++ " guessed #" ++ Cu.col2hex color) ]
+                ]
+
+        invalidItem reason =
+            H.li [ class "b-w" ] [ H.text reason ]
     in
     [ H.h2 [ class "b-w" ] [ H.text ("The answer was #" ++ secretHex) ]
-    , H.ol [ class "round-list" ] (L.map showAnswer sortedPlayers)
+    , H.ol [ class "round-list" ] (L.indexedMap validItem sortedPlayers)
+    , H.ul [ class "b-w" ] (L.map invalidItem invalidPlayers)
     , H.p [] [ H.button [ onClick LeaveGame, class "button" ] [ H.text "Home" ] ]
     , overrideBackground secretHex
     ]
@@ -181,24 +212,3 @@ debriefView model =
 
 overrideBackground hexcode =
     H.node "style" [] [ H.text (":root{--secret: #" ++ hexcode ++ "}") ]
-
-
-showAnswer : Player -> H.Html Msg
-showAnswer ( username, answer ) =
-    case answer of
-        Just (Ok color) ->
-            H.li [ style [ ( "background-color", "#" ++ Cu.col2hex color ) ], class "b-w" ]
-                [ H.span
-                    []
-                    [ H.text (username ++ " guessed #" ++ Cu.col2hex color) ]
-                ]
-
-        Just (Err problem) ->
-            H.li []
-                [ H.span
-                    []
-                    [ H.text (username ++ " had a problem") ]
-                ]
-
-        Nothing ->
-            H.li [] [ H.text (username ++ " didn't answer!") ]

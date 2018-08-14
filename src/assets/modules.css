@@ -39,3 +39,9 @@
 .debrief ol li:last-child, .debrief li:first-child {
   border-bottom: none;
 }
+
+.debrief ul {
+  list-style-type: none;
+  margin-top: 2em;
+  padding-left: 1.5rem;
+}

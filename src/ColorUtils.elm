@@ -15,14 +15,9 @@ col2hex color =
     [ rgb.red, rgb.green, rgb.blue ] |> L.map (int2hex >> S.padLeft 2 '0') |> S.join ""
 
 
-accuracy : Color -> Player -> Float
-accuracy mainColor player =
-    case player of
-        ( _, Just (Ok color) ) ->
-            1.0 / colorDistance mainColor color
-
-        _ ->
-            0.0
+accuracy : Color -> Color -> Float
+accuracy mainColor playerColor =
+    1.0 / colorDistance mainColor playerColor
 
 
 int2hex : Int -> String
