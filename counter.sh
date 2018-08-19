@@ -1,6 +1,8 @@
 #! /bin/sh
 
-for count in $(seq 20 -1 0)
+[ -z $TIMEOUT ] && export TIMEOUT=30
+
+for count in $(seq $TIMEOUT -1 0)
 do
   sleep 1
   echo `date -Ins` countdown $count >> "$1"

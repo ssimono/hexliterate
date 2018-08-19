@@ -16,7 +16,7 @@ FROM debian:jessie-slim AS runner
 
 ENV WSD_STATICDIR=/var/www
 ENV WSD_PORT=8000
-ENV WSD_PASSENV=GAME_FOLDER
+ENV WSD_PASSENV=GAME_FOLDER,TIMEOUT
 ENV GAME_FOLDER=/var/data/
 
 COPY --from=golang ["/go/bin/websocketd", "/usr/bin/"]

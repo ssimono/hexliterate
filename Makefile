@@ -20,7 +20,7 @@ node_modules: package.json
 
 up:
 	GAME_FOLDER="$(shell pwd)/games" websocketd\
-	  --passenv GAME_FOLDER\
+	  --passenv GAME_FOLDER,TIMEOUT\
 	  --staticdir="$(shell pwd)/dist"\
 	  --port=8000\
 	  "$(shell pwd)/socket.sh"
