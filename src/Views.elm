@@ -127,6 +127,9 @@ arenaView model =
                 _ ->
                     False
 
+        spectator =
+            L.length me == 0
+
         disabled =
             if done then
                 [ attribute "disabled" "1" ]
@@ -135,19 +138,24 @@ arenaView model =
 
         currentAnswer =
             "#" ++ model.answer ++ S.repeat (6 - S.length model.answer) "_"
+
+        colorInput =
+            H.input
+                (L.append disabled
+                    [ onInput EditAnswer
+                    , value model.answer
+                    , id "color-input"
+                    ]
+                )
+                []
     in
     [ H.h2 [ class "b-w" ] [ H.text "What color is this?" ]
     , H.h3 [ class "b-w" ] [ H.text currentAnswer ]
     , H.p []
-        [ H.input
-            (L.append disabled
-                [ onInput EditAnswer
-                , value model.answer
-                , id "color-input"
-                ]
-            )
-            []
-        , if done then
+        [ cond (not spectator) colorInput
+        , if spectator then
+            H.p [ class "b-w" ] [ H.text "Game has already started, you're watching as a spectator" ]
+          else if done then
             H.p [ class "b-w" ] [ H.text "Good job! Let's wait for the others" ]
           else if model.countdown <= 5 then
             H.p [ class "b-w" ] [ H.text ("Game ends in " ++ toString model.countdown) ]
@@ -212,3 +220,11 @@ debriefView model =
 
 overrideBackground hexcode =
     H.node "style" [] [ H.text (":root{--secret: #" ++ hexcode ++ "}") ]
+
+
+cond : Bool -> H.Html Msg -> H.Html Msg
+cond predicate node =
+    if predicate then
+        node
+    else
+        H.text ""
