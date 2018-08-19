@@ -51,6 +51,22 @@ update msg previousModel =
         NoOp ->
             ( model, Cmd.none )
 
+        Connected ->
+            let
+                ( initial, _ ) =
+                    init model.wsServer
+            in
+            ( { initial
+                | username = model.username
+                , error =
+                    if model.stage == Frontdesk then
+                        ""
+                    else
+                        "You got disconnected"
+              }
+            , Cmd.none
+            )
+
         LeaveGame ->
             let
                 ( initial, _ ) =
@@ -231,6 +247,9 @@ handleSocket message =
             S.split " " message |> L.filter (\s -> not (S.isEmpty s))
     in
     case parts of
+        [ "hello" ] ->
+            Connected
+
         [ date, author, "registered" ] ->
             Registered author
 

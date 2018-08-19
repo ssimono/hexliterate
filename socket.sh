@@ -15,6 +15,8 @@ validate='
 /^submit [a-fA-F0-9]{6}$/p;
 '
 
+echo "hello"
+
 while read line
 do
   cmd=$(echo "$line" | sed -rn "$validate" | cut -d ' ' -f 1)

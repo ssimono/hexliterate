@@ -34,6 +34,7 @@ type GameStage
 
 type Msg
     = EditUsername String
+    | Connected
     | Register
     | Registered String
     | RefreshGames
