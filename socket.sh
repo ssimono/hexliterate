@@ -31,8 +31,10 @@ do
     continue
     ;;
   "list")
-    prefix="`date -Ins` $username gameitem"
-    ls -rt "$GAME_FOLDER" | sed "s/^/$prefix /;s/\.log//g"
+    find "$GAME_FOLDER" -type f -cmin -15 -printf\
+      "%CY-%Cm-%CdT%CT $username gameitem %f\n"\
+      | sed "s/\.log//g"\
+      | sort
     game=''
     continue
     ;;
