@@ -5,6 +5,10 @@ Hexliterate is a fun game: each player opens it with their browser (ideally on t
 
 ![Screenshot](./screenshot.png)
 
+## Try it online
+
+A demo is running at https://hex.sa-web.fr
+
 ## Run with Docker
 
     docker run -p 8000:8000 -v hexliterate:/var/data ssimono/hexliterate
