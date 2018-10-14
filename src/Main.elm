@@ -27,6 +27,7 @@ init ws_server =
       , players = []
       , stage = Frontdesk
       , gameId = Nothing
+      , gameMaster = ""
       , games = []
       , secretColor = Color.white
       , countdown = 0
@@ -143,6 +144,11 @@ lobbyUpdate msg model =
         ( Just gameId, NewPlayer username ) ->
             ( { model
                 | players = L.append model.players [ ( username, Nothing ) ]
+                , gameMaster =
+                    if L.length model.players == 0 then
+                        username
+                    else
+                        model.gameMaster
               }
             , Cmd.none
             )

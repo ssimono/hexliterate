@@ -108,7 +108,10 @@ lobbyView model =
                 placeholder
               else
                 playerList
-            , H.p [] [ H.button [ onClick StartGame, class "button" ] [ H.text "Go!" ] ]
+            , if model.gameMaster == model.username then
+                H.p [] [ H.button [ onClick StartGame, class "button" ] [ H.text "Go!" ] ]
+              else
+                H.p [] [ H.text ("Waiting for " ++ model.gameMaster ++ " to start the game...") ]
             ]
 
 

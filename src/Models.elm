@@ -9,6 +9,7 @@ type alias Model =
     , stage : GameStage
     , games : List String
     , gameId : Maybe String
+    , gameMaster : String
     , secretColor : Color
     , countdown : Int
     , answer : String
