@@ -4,12 +4,12 @@ import Color exposing (Color)
 
 
 type alias Model =
-    { username : String
+    { userId : Maybe Int
     , players : List Player
     , stage : GameStage
     , games : List String
     , gameId : Maybe String
-    , gameMaster : String
+    , gameMaster : Int
     , secretColor : Color
     , countdown : Int
     , answer : String
@@ -18,16 +18,15 @@ type alias Model =
     }
 
 
-type alias Guess =
-    Maybe (Result String Color)
-
-
 type alias Player =
-    ( String, Guess )
+    { id : Int
+    , username : String
+    , guess : Maybe (Result String Color)
+    }
 
 
 type GameStage
-    = Frontdesk
+    = Frontdesk String
     | Lobby
     | Arena
     | Debrief
@@ -37,17 +36,27 @@ type Msg
     = EditUsername String
     | Connected
     | Register
-    | Registered String
+    | Registered Player
     | RefreshGames
     | GameReceived String
     | CreateGame
     | JoinGame String
     | LeaveGame
-    | NewPlayer String
+    | NewPlayer Player
     | Error String
     | StartGame
     | GameStarted Color
     | Countdown Int
     | EditAnswer String
-    | AnswerSubmitted String String
+    | AnswerSubmitted Int String
     | NoOp
+
+
+parsePlayer : String -> Result String Player
+parsePlayer userdef =
+    case String.split ":" userdef of
+        [ user_id, username ] ->
+            String.toInt user_id |> Result.map (\user_id -> Player user_id username Nothing)
+
+        _ ->
+            Result.Err "Cannot parse user"

@@ -1,9 +1,9 @@
 PATH := $(shell pwd)/node_modules/.bin:$(PATH)
 ASSETS := $(subst src/,dist/,$(shell find src/assets -type f))
 
-all: dist dist/bundle.js dist/index.html dist/debug.html ${ASSETS} node_modules
+all: dist dist/bundle.js dist/index.html dist/debug.html ${ASSETS}
 
-dist/bundle.js: src/*.elm
+dist/bundle.js: node_modules src/*.elm
 	elm make src/Main.elm --output dist/bundle.js
 
 dist/%.html: src/%.html
@@ -18,9 +18,12 @@ dist dist/assets:
 node_modules: package.json
 	npm install
 
-up:
-	GAME_FOLDER="$(shell pwd)/games" websocketd\
-	  --passenv GAME_FOLDER,TIMEOUT\
+db.db: sql/schema.sql
+	[ -f db.db ] && mv db.db backup_$(shell date -Iseconds).db || true
+	sqlite3 db.db < sql/schema.sql
+
+up: db.db
+	websocketd\
 	  --staticdir="$(shell pwd)/dist"\
 	  --port=8000\
 	  "$(shell pwd)/socket.sh"

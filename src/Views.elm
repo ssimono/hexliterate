@@ -1,5 +1,6 @@
 module Views exposing (view)
 
+import Color exposing (Color)
 import ColorUtils as Cu
 import Html as H
 import Html.Attributes exposing (..)
@@ -15,8 +16,8 @@ view model =
     let
         content =
             case model.stage of
-                Frontdesk ->
-                    frontdeskView model
+                Frontdesk username ->
+                    frontdeskView username model
 
                 Lobby ->
                     lobbyView model
@@ -39,7 +40,7 @@ view model =
 stageClass : GameStage -> String
 stageClass stage =
     case stage of
-        Frontdesk ->
+        Frontdesk _ ->
             "frontdesk"
 
         Lobby ->
@@ -52,14 +53,14 @@ stageClass stage =
             "debrief"
 
 
-frontdeskView : Model -> List (H.Html Msg)
-frontdeskView model =
+frontdeskView : String -> Model -> List (H.Html Msg)
+frontdeskView username model =
     [ H.h1 [] [ H.text "Guess the Color" ]
     , H.div [ class "login-form round-list" ]
-        [ H.input [ onInput EditUsername, value model.username, placeholder "Pick a username" ] []
+        [ H.input [ onInput EditUsername, value username, placeholder "Pick a username" ] []
         , H.button
             (L.append [ onClick Register, class "button" ]
-                (if S.isEmpty model.username then
+                (if S.isEmpty username then
                     [ attribute "disabled" "1" ]
                  else
                     []
@@ -88,8 +89,8 @@ lobbyView model =
 
         Just gameId ->
             let
-                listItem ( username, answer ) =
-                    H.li [] [ H.text (username ++ " is ready") ]
+                listItem player =
+                    H.li [] [ H.text (player.username ++ " is ready") ]
 
                 playerList =
                     H.ul [ class "round-list" ] (L.map listItem (L.filter notMe model.players))
@@ -97,21 +98,27 @@ lobbyView model =
                 alone =
                     L.length model.players == 1
 
-                notMe ( username, answer ) =
-                    username /= model.username
+                notMe player =
+                    Just player.id /= model.userId
 
                 placeholder =
                     H.p [] [ H.text "Let's wait for some players to join..." ]
+
+                gameMaster =
+                    model.players
+                        |> L.filter (\p -> p.id == model.gameMaster)
+                        |> L.head
+                        |> Maybe.withDefault (Player 0 "???" Nothing)
             in
             [ H.h2 [] [ H.text gameId ]
             , if alone then
                 placeholder
               else
                 playerList
-            , if model.gameMaster == model.username then
+            , if Just gameMaster.id == model.userId then
                 H.p [] [ H.button [ onClick StartGame, class "button" ] [ H.text "Go!" ] ]
               else
-                H.p [] [ H.text ("Waiting for " ++ model.gameMaster ++ " to start the game...") ]
+                H.p [] [ H.text ("Waiting for " ++ gameMaster.username ++ " to start the game...") ]
             ]
 
 
@@ -120,11 +127,11 @@ arenaView model =
     let
         ( me, others ) =
             model.players
-                |> L.partition (\( u, a ) -> u == model.username)
+                |> L.partition (\p -> Just p.id == model.userId)
 
         done =
-            case me of
-                [ ( username, Just answer ) ] ->
+            case List.map .guess me |> List.head of
+                Just (Just (Ok answer)) ->
                     True
 
                 _ ->
@@ -167,8 +174,8 @@ arenaView model =
         ]
     , H.ul [ class "b-w news" ]
         (L.map
-            (\( u, _ ) -> H.li [] [ H.text (u ++ " is done!") ])
-            (others |> L.filter (\( u, a ) -> a /= Nothing))
+            (\p -> H.li [] [ H.text (p.username ++ " is done!") ])
+            (others |> L.filter (\p -> p.guess /= Nothing))
         )
     , overrideBackground (Cu.col2hex model.secretColor)
     ]
@@ -180,21 +187,22 @@ debriefView model =
         secretHex =
             Cu.col2hex model.secretColor
 
-        parsePlayer ( username, answer ) ( valid, invalid ) =
-            case answer of
+        parsePlayer : Player -> ( List ( String, Color ), List String ) -> ( List ( String, Color ), List String )
+        parsePlayer player ( valid, invalid ) =
+            case player.guess of
                 Just (Ok color) ->
-                    ( ( username, color ) :: valid
+                    ( ( player.username, color ) :: valid
                     , invalid
                     )
 
                 Just (Err problem) ->
                     ( valid
-                    , (username ++ " had a problem") :: invalid
+                    , (player.username ++ " had a problem") :: invalid
                     )
 
                 Nothing ->
                     ( valid
-                    , (username ++ " had no idea") :: invalid
+                    , (player.username ++ " had no idea") :: invalid
                     )
 
         ( validPlayers, invalidPlayers ) =

@@ -1,71 +1,46 @@
-#! /bin/sh
+#! /bin/bash
 
-username="anonymous"
-game=''
-watch_pid=''
-count_cmd=$(PATH=$PWD:$PATH which counter.sh)
+database='db.db'
+session_id=$$
+debug=$([[ -z $SQL_OUTPUT ]] && echo '' || echo ".trace $SQL_OUTPUT")
 
-validate='
-/^register \S+$/p;
-/^list$/p;
-/^create$/p;
-/^join \w{4}$/p;
-/^leave$/p;
-/^start$/p;
-/^submit [a-fA-F0-9]{6}$/p;
-'
+query(){
+  sqlite3 -noheader -bail -cmd '.timeout 400' -cmd "$debug" $database <<< "$1"
+}
 
-echo "hello"
+# start the session
+query "insert into session (id) values ($session_id);"
+echo 'hello'
 
-while read line
+# handler for notification
+read_notifications(){
+  query "
+    begin immediate transaction;
+    select timestamp, event, arg1, arg2 from notification
+      where session_id = $session_id;
+    update active_user
+      set last_command_id = (select seq from sqlite_sequence where name = 'command')
+      where session_id = $session_id;
+    commit;"
+}
+trap 'read_notifications' USR1
+
+logout(){
+  query "delete from session where id=$session_id"
+}
+trap 'logout' EXIT KILL
+
+# read input from the client
+while read cmd arg1 arg2
 do
-  cmd=$(echo "$line" | sed -rn "$validate" | cut -d ' ' -f 1)
-  case $cmd in
-    "")
-    echo "`date -Ins` $username bad-message $line"
-    continue
-    ;;
-  "register")
-    username=$(echo $line | cut -d ' ' -f 2)
-    echo "`date -Ins` $username registered"
-    continue
-    ;;
-  "list")
-    find "$GAME_FOLDER" -type f -cmin -15 -printf\
-      "%CY-%Cm-%CdT%CT $username gameitem %f\n"\
-      | sed "s/\.log//g"\
-      | sort
-    game=''
-    continue
-    ;;
-  "create")
-    game=$(mktemp "$GAME_FOLDER/XXXX.log")
-    line="$line $(basename -s .log $game)"
-    echo "`date -Ins` $username $line"
-    continue
-    ;;
-  "join")
-    if [ -w $game ]; then
-      kill $watch_pid 2>/dev/null
-      hash=$(echo $line | cut -d ' ' -f 2)
-      game="$GAME_FOLDER/$hash.log"
-      tail -f -n 0 --pid=$$ $game & watch_pid=$!
-      cat $game
-      sleep 0.5
-    else
-      cat $game
-      continue
-    fi
-    ;;
-  "leave")
-    kill $watch_pid 2>/dev/null
-    game=''
-    ;;
-  "start")
-    line="$line `head -c 100 /dev/urandom | sha1sum -b | head -c 6`"
-    `$count_cmd $game` &
-    ;;
-  esac
+  grep -P '^[a-z_]{3,32}(:[a-zA-Z0-9+/]{0,100}){2}$' <<<"$cmd:$arg1:$arg2" >/dev/null || continue
 
-  echo "`date -Ins` $username $line" >> $game
+  [[ $cmd == 'get' ]] && query "select * from [get__$arg1] where session_id=$session_id;" \
+  || query "pragma foreign_keys=on; begin transaction;
+    insert into create_command (session_id, type, arg1, arg2)
+      values ($session_id, '$cmd', '$arg1', '$arg2');
+    select shell_cmd from effect
+      where command_id = (select seq from sqlite_sequence where name = 'command');
+    commit;
+    " | while read effect; do (eval $effect); done
 done

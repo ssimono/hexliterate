@@ -18,7 +18,7 @@ Ex: `WSD_LOGLEVEL=debug` will pass `--loglevel=debug` to websocketd
 
 ## Run from source
 
-1. Install the requirements: [websocketd](http://websocketd.com/) and [node js](https://nodejs.org/en/)
+1. Install the requirements: [websocketd](http://websocketd.com/), [node js](https://nodejs.org/en/) and [sqlite3](https://sqlite.org/index.html)
 2. `git clone` and `cd` into the project
 3. Build the assets with `make` (use `watch make` rebuild upon changes)
 4. Launch the server with `make up`

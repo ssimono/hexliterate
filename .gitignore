@@ -1,5 +1,5 @@
 dist
+db.db
 elm-stuff
-games
 node_modules
 npm-debug.log

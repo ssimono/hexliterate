@@ -23,11 +23,11 @@ main =
 
 
 init ws_server =
-    ( { username = ""
+    ( { userId = Nothing
       , players = []
-      , stage = Frontdesk
+      , stage = Frontdesk ""
       , gameId = Nothing
-      , gameMaster = ""
+      , gameMaster = 0
       , games = []
       , secretColor = Color.white
       , countdown = 0
@@ -58,12 +58,13 @@ update msg previousModel =
                     init model.wsServer
             in
             ( { initial
-                | username = model.username
-                , error =
-                    if model.stage == Frontdesk then
-                        ""
-                    else
-                        "You got disconnected"
+                | error =
+                    case model.stage of
+                        Frontdesk _ ->
+                            ""
+
+                        _ ->
+                            "You got disconnected"
               }
             , Cmd.none
             )
@@ -74,16 +75,16 @@ update msg previousModel =
                     init model.wsServer
             in
             ( { initial
-                | username = model.username
+                | userId = Nothing
                 , stage = Lobby
               }
-            , WebSocket.send model.wsServer "list"
+            , WebSocket.send model.wsServer "get recentgames"
             )
 
         _ ->
             case model.stage of
-                Frontdesk ->
-                    frontdeskUpdate msg model
+                Frontdesk username ->
+                    frontdeskUpdate username msg model
 
                 Lobby ->
                     lobbyUpdate msg model
@@ -95,20 +96,20 @@ update msg previousModel =
                     debriefUpdate msg model
 
 
-frontdeskUpdate : Msg -> Model -> ( Model, Cmd Msg )
-frontdeskUpdate msg model =
+frontdeskUpdate : String -> Msg -> Model -> ( Model, Cmd Msg )
+frontdeskUpdate username msg model =
     case msg of
-        EditUsername username ->
-            ( { model | username = username }, Cmd.none )
+        EditUsername new_username ->
+            ( { model | stage = Frontdesk new_username }, Cmd.none )
 
         Register ->
             ( model
-            , "register " ++ model.username |> WebSocket.send model.wsServer
+            , "register " ++ username |> WebSocket.send model.wsServer
             )
 
-        Registered username ->
-            ( { model | username = username, stage = Lobby }
-            , WebSocket.send model.wsServer "list"
+        Registered player ->
+            ( { model | userId = Just player.id, stage = Lobby }
+            , WebSocket.send model.wsServer "get recentgames"
             )
 
         _ ->
@@ -123,12 +124,12 @@ lobbyUpdate msg model =
 
         ( Nothing, CreateGame ) ->
             ( model
-            , WebSocket.send model.wsServer "create"
+            , WebSocket.send model.wsServer "create_game"
             )
 
         ( Nothing, JoinGame gameId ) ->
             ( { model | gameId = Just gameId }
-            , WebSocket.send model.wsServer ("join " ++ gameId)
+            , WebSocket.send model.wsServer ("join_game " ++ gameId)
             )
 
         ( Just gameId, StartGame ) ->
@@ -141,12 +142,12 @@ lobbyUpdate msg model =
             , Dom.focus "color-input" |> Task.attempt (\_ -> NoOp)
             )
 
-        ( Just gameId, NewPlayer username ) ->
+        ( Just gameId, NewPlayer player ) ->
             ( { model
-                | players = L.append model.players [ ( username, Nothing ) ]
+                | players = model.players ++ L.singleton player
                 , gameMaster =
                     if L.length model.players == 0 then
-                        username
+                        player.id
                     else
                         model.gameMaster
               }
@@ -154,7 +155,7 @@ lobbyUpdate msg model =
             )
 
         ( _, RefreshGames ) ->
-            ( { model | games = [] }, WebSocket.send model.wsServer "list" )
+            ( { model | games = [] }, WebSocket.send model.wsServer "get recentgames" )
 
         _ ->
             ( model, Cmd.none )
@@ -177,26 +178,19 @@ arenaUpdate msg model =
                 Cmd.none
             )
 
-        AnswerSubmitted username answer ->
+        AnswerSubmitted userId answer ->
             let
-                player =
-                    model.players
-                        |> L.filter (\( u, a ) -> u == username)
-                        |> L.head
-
                 legit =
-                    case player of
-                        Nothing ->
-                            False
-
-                        Just ( name, answer ) ->
-                            True
+                    model.players
+                        |> L.filter (\p -> p.id == userId)
+                        |> L.length
+                        |> (>) 0
 
                 done =
                     legit
                         && (model.players
-                                |> L.filter (\( u, a ) -> u /= username)
-                                |> L.all (\( u, a ) -> a /= Nothing)
+                                |> L.filter (\p -> p.id /= userId)
+                                |> L.all (\p -> p.guess /= Nothing)
                            )
             in
             ( if legit then
@@ -204,11 +198,11 @@ arenaUpdate msg model =
                     | players =
                         model.players
                             |> L.map
-                                (\( u, a ) ->
-                                    if u == username then
-                                        ( u, Just (parseAnswer answer) )
+                                (\p ->
+                                    if p.id == userId then
+                                        { p | guess = Just (parseAnswer answer) }
                                     else
-                                        ( u, a )
+                                        p
                                 )
                     , stage =
                         if done then
@@ -250,20 +244,33 @@ subscriptions model =
 handleSocket message =
     let
         parts =
-            S.split " " message |> L.filter (\s -> not (S.isEmpty s))
+            S.split "|" message |> L.filter (\s -> not (S.isEmpty s))
     in
     case parts of
         [ "hello" ] ->
             Connected
 
-        [ date, author, "registered" ] ->
-            Registered author
+        [ datetime, "registered", _, userdef ] ->
+            case parsePlayer userdef of
+                Result.Ok me ->
+                    Registered me
 
-        [ date, author, "gameitem", gameId ] ->
+                Result.Err problem ->
+                    Error problem
+
+        [ datetime, "game_created", gameId ] ->
             GameReceived gameId
 
-        [ date, author, "join", gameId ] ->
-            NewPlayer author
+        [ _, "game", gameId, status ] ->
+            GameReceived gameId
+
+        [ datetime, "game_joined", gameId, userdef ] ->
+            case parsePlayer userdef of
+                Result.Ok newPlayer ->
+                    NewPlayer newPlayer
+
+                Result.Err problem ->
+                    Error problem
 
         [ date, author, "create", gameId ] ->
             RefreshGames
@@ -276,9 +283,8 @@ handleSocket message =
                 Err problem ->
                     Error ("Bad color: " ++ problem)
 
-        [ date, author, "submit", answer ] ->
-            AnswerSubmitted author answer
-
+        -- [ date, author, "submit", answer ] ->
+        --     AnswerSubmitted author answer
         [ date, "countdown", sCounter ] ->
             case S.toInt sCounter of
                 Ok counter ->
