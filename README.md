@@ -7,7 +7,7 @@ Hexliterate is a fun game: each player opens it with their browser (ideally on t
 
 ## Try it online
 
-A demo is running at https://hex.sa-web.fr
+A demo is running at https://hex.s10a.dev/
 
 ## Run with Docker
 
