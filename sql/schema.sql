@@ -12,7 +12,8 @@ create table command (
     constraint valid_command_name check (type in (
       'register',
       'create_game',
-      'join_game'
+      'join_game',
+      'start_game'
     ) or (id = 1 and type = 'init')),
   arg1 varchar,
   arg2 varchar,
@@ -86,7 +87,7 @@ create view effect (command_id, type, shell_cmd) as
   select id, 'nudge', printf('kill -s USR1 %d', session_id) as shell_cmd
   from command
   cross join active_user
-  where command.type in ('create_game', 'join_game');
+  where command.type in ('create_game', 'join_game', 'start_game');
 
 create view notification (session_id, event, timestamp, arg1, arg2) as
   select
@@ -95,6 +96,7 @@ create view notification (session_id, event, timestamp, arg1, arg2) as
       when 'register' then 'registered'
       when 'create_game' then 'game_created'
       when 'join_game' then 'game_joined'
+      when 'start_game' then 'game_started'
     end as event,
     [timestamp], arg1, arg2
   from command
@@ -105,6 +107,7 @@ create view notification (session_id, event, timestamp, arg1, arg2) as
       when 'register' then command.user_id = active_user.user_id
       when 'create_game' then 1
       when 'join_game' then 1
+      when 'start_game' then 1
     end
   )
   order by command.timestamp;
@@ -122,6 +125,29 @@ create view get__recentgames (session_id, item, id, status, secret_color) as
   from game
   inner join active_user
   where created_at > datetime('now', '-30 minutes');
+
+create view get__players (session_id, item, game_id, user, is_owner, user_status) as
+  select
+    active_user.session_id,
+    'player' as item,
+    user_game.game_id,
+    player.user,
+    player.is_owner,
+    player.user_status
+  from (
+    select
+      user_game.game_id,
+      printf('%d:%s', user.id, user.username) as user,
+      user.id=game.owner as is_owner,
+      'guessing' as user_status,
+      user_game.created_at
+    from game
+    inner join user_game on user_game.game_id=game.id
+    inner join user on user.id=user_game.user_id
+  ) as player
+  inner join user_game using(game_id)
+  inner join active_user using(user_id)
+  order by player.created_at;
 
 --------------
 -- triggers --
@@ -163,7 +189,21 @@ create trigger on_join_game after insert on command
   when new.type = 'join_game'
   begin
     insert into user_game(user_id, game_id) values (new.user_id, new.arg1);
-    update command set arg2 = (select printf('%d:%s', new.user_id, username) from user where id=new.user_id);
+    update command set arg2 = (select printf('%d:%s', new.user_id, username) from user where id=new.user_id); ---- ?????
+  end;
+
+create trigger on_start_game after insert on command
+  when new.type = 'start_game'
+  begin
+    select
+      ifnull(game.id, raise(abort, 'not_found')),
+      case when game.status <> 'created' then raise(abort, 'forbidden') end
+      from active_user
+      left join game on game.owner=active_user.user_id and game.id=new.arg1
+      where active_user.user_id=new.user_id;
+    update game
+      set status='running', ends_at=datetime('now', '+30 seconds')
+      where id=new.arg1;
   end;
 
 create trigger last_command instead of update of last_command_id on active_user
