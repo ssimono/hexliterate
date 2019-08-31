@@ -24,9 +24,7 @@ create table user (
   id integer primary key autoincrement,
   username varchar
     constraint username_length check (length(username) between 3 and 15),
-  created_at integer default (datetime('now')),
-  last_command_id integer not null,
-  foreign key (last_command_id) references command (id)
+  created_at integer default (datetime('now'))
 );
 
 create table session (
@@ -35,6 +33,16 @@ create table session (
   expires_at integer default (datetime('now', '+1 day')),
   user_id integer default null,
   foreign key (user_id) references user (id)
+);
+
+create table notification (
+  id integer not null primary key autoincrement,
+  command_id integer not null,
+  timestamp integer not null default (datetime('now')),
+  name varchar not null,
+  body varchar default null,
+  scope varchar not null default 'system',
+  foreign key (command_id) references command (id)
 );
 
 create table game (
@@ -66,51 +74,45 @@ create table user_game (
 create view create_command(session_id, type, arg1, arg2) as
   select raise(abort, 'write_only_view');
 
-create view active_user (user_id, session_id, username, last_command_id) as
+create view active_user (user_id, session_id, username) as
   select
     user.id as user_id,
     session.id as session_id,
-    user.username,
-    user.last_command_id
+    user.username
   from user inner join session on session.user_id = user.id
   where session.expires_at > datetime('now');
 
-create view effect (command_id, type, shell_cmd) as
-  -- nudge command author
-  select id, 'nudge', printf('kill -s USR1 %d', session_id) as shell_cmd
-  from command
-  inner join active_user using (user_id)
-  where command.type in ('register')
+create view effect (type, shell_cmd) as
+  select 'nudge', printf('kill -s USR1 %d', session_id) as shell_cmd
+  from active_user;
 
-  -- nudge all active users to read their notifications
-  union
-  select id, 'nudge', printf('kill -s USR1 %d', session_id) as shell_cmd
-  from command
-  cross join active_user
-  where command.type in ('create_game', 'join_game', 'start_game');
-
-create view notification (session_id, event, timestamp, arg1, arg2) as
-  select
-    session_id,
-    case type
-      when 'register' then 'registered'
-      when 'create_game' then 'game_created'
-      when 'join_game' then 'game_joined'
-      when 'start_game' then 'game_started'
-    end as event,
-    [timestamp], arg1, arg2
-  from command
-  cross join active_user
-  where command.id > active_user.last_command_id
-  and (
-    case type
-      when 'register' then command.user_id = active_user.user_id
-      when 'create_game' then 1
-      when 'join_game' then 1
-      when 'start_game' then 1
-    end
+create view get__notifications (session_id, event, timestamp, body) as
+  with scoped_user as (
+    select user_id, session_id, printf(
+      'broadcast,user:%d,%s',
+      user_id,
+      case game.id
+        when null then 'lobby'
+        else case game.status
+          when 'created' then printf('lobby,game:%d', game.id)
+          when 'running' then printf('game:%d', game.id)
+          else 'lobby'
+        end
+      end
+    ) as scopes
+    from active_user
+    left join user_game using(user_id)
+    left join game on user_game.game_id=game.id and game.status <> 'done'
   )
-  order by command.timestamp;
+  select
+    scoped_user.session_id,
+    notification.name,
+    cast (strftime('%s', notification.timestamp) as numeric) as timestamp,
+    notification.body
+  from notification
+  inner join scoped_user on instr(scoped_user.scopes, notification.scope) > 0
+  where notification.timestamp > datetime('now', '-1 day')
+  order by notification.timestamp;
 
 create view get__recentgames (session_id, item, id, status, secret_color) as
   select
@@ -157,13 +159,21 @@ create view get__players (session_id, item, game_id, user, is_owner, user_status
 create trigger register instead of insert on create_command
   when new.type = 'register'
   begin
-    insert into user (username, last_command_id)
-      values (new.arg1, (select seq from sqlite_sequence where name='command'));
+    insert into user (username) values (new.arg1);
     update session set
       user_id = last_insert_rowid()
       where id=new.session_id;
-    insert into command(user_id, type, arg1, arg2)
-      values (last_insert_rowid(), 'register', new.arg1, printf('%d:%s', last_insert_rowid(), new.arg1));
+    insert into command(user_id, type, arg1)
+      values (last_insert_rowid(), 'register', new.arg1);
+    insert into notification (command_id, name, body, scope)
+      select
+        last_insert_rowid() as command_id,
+        'registered' as name,
+        printf('%d:%s', user.id, user.username) as body,
+        printf('user:%d', user.id) as scope
+      from command
+      inner join user on user.id=command.user_id
+      where command.id=last_insert_rowid();
   end;
 
 create trigger auth_layer instead of insert on create_command
@@ -182,34 +192,43 @@ create trigger on_create_game after insert on command
   when new.type = 'create_game'
   begin
     insert into game(owner) values (new.user_id);
-    update command set arg1 = last_insert_rowid() where id = new.id;
+    insert into notification (command_id, name, body, scope)
+      values(new.id, 'game_created', last_insert_rowid(), 'lobby');
   end;
 
 create trigger on_join_game after insert on command
   when new.type = 'join_game'
   begin
     insert into user_game(user_id, game_id) values (new.user_id, new.arg1);
-    update command set arg2 = (select printf('%d:%s', new.user_id, username) from user where id=new.user_id); ---- ?????
+    insert into notification (command_id, name, body, scope)
+      select
+        new.id,
+        'game_joined',
+        printf('%d|%d:%s', new.arg1, new.user_id, username),
+        printf('game:%s', new.arg1)
+      from user where id=new.user_id;
   end;
 
 create trigger on_start_game after insert on command
   when new.type = 'start_game'
   begin
-    select
-      ifnull(game.id, raise(abort, 'not_found')),
-      case when game.status <> 'created' then raise(abort, 'forbidden') end
-      from active_user
-      left join game on game.owner=active_user.user_id and game.id=new.arg1
-      where active_user.user_id=new.user_id;
+    with current_game as (select * from game where id=new.arg1)
+    select case exists (select id from current_game) when 0 then raise(abort, 'not_found') end
+    union select case
+        when current_game.owner <> new.user_id then raise(abort, 'forbidden')
+        when current_game.status <> 'created' then raise(abort, 'invalid')
+      end
+    from current_game;
     update game
       set status='running', ends_at=datetime('now', '+30 seconds')
       where id=new.arg1;
-  end;
-
-create trigger last_command instead of update of last_command_id on active_user
-  begin
-    update user set last_command_id = new.last_command_id
-    where id = old.user_id;
+    insert into notification (command_id, name, body, scope)
+      select
+        new.id,
+        'game_started',
+        printf('%d|%s', game.id, game.secret_color),
+        printf('game:%s', new.arg1)
+      from game where id=new.arg1;
   end;
 
 ----------

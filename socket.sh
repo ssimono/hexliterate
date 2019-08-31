@@ -2,6 +2,7 @@
 
 database='db.db'
 session_id=$$
+last_read_notification=$(date +%s)
 debug=$([[ -z $SQL_OUTPUT ]] && echo '' || echo ".trace $SQL_OUTPUT")
 
 query(){
@@ -14,14 +15,10 @@ echo 'hello'
 
 # handler for notification
 read_notifications(){
-  query "
-    begin immediate transaction;
-    select timestamp, event, arg1, arg2 from notification
-      where session_id = $session_id;
-    update active_user
-      set last_command_id = (select seq from sqlite_sequence where name = 'command')
-      where session_id = $session_id;
-    commit;"
+  _now=$(date +%s)
+  query "select timestamp, event, body from get__notifications
+    where session_id = $session_id and timestamp > $last_read_notification;"
+  last_read_notification=$_now
 }
 trap 'read_notifications' USR1
 
@@ -39,8 +36,7 @@ do
   || query "pragma foreign_keys=on; begin transaction;
     insert into create_command (session_id, type, arg1, arg2)
       values ($session_id, '$cmd', '$arg1', '$arg2');
-    select shell_cmd from effect
-      where command_id = (select seq from sqlite_sequence where name = 'command');
+    select shell_cmd from effect;
     commit;
     " | while read effect; do (eval $effect); done
 done
