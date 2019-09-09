@@ -41,6 +41,7 @@ type Msg
     | GameReceived String
     | CreateGame
     | JoinGame String
+    | GameJoined Player String
     | LeaveGame
     | NewPlayer Player
     | Error String

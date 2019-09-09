@@ -128,13 +128,18 @@ lobbyUpdate msg model =
             )
 
         ( Nothing, JoinGame gameId ) ->
-            ( { model | gameId = Just gameId }
+            ( model
             , WebSocket.send model.wsServer ("join_game " ++ gameId)
+            )
+
+        ( Nothing, GameJoined player gameId ) ->
+            ( { model | gameId = Just gameId }
+            , WebSocket.send model.wsServer "get players"
             )
 
         ( Just gameId, StartGame ) ->
             ( model
-            , WebSocket.send model.wsServer "start"
+            , WebSocket.send model.wsServer ("start_game " ++ gameId)
             )
 
         ( Just gameId, GameStarted secretColor ) ->
@@ -173,7 +178,7 @@ arenaUpdate msg model =
                         model.answer
               }
             , if S.length answer == 6 then
-                WebSocket.send model.wsServer ("submit " ++ answer)
+                WebSocket.send model.wsServer ("submit_answer " ++ answer)
               else
                 Cmd.none
             )
@@ -250,7 +255,7 @@ handleSocket message =
         [ "hello" ] ->
             Connected
 
-        [ datetime, "registered", _, userdef ] ->
+        [ datetime, "registered", userdef ] ->
             case parsePlayer userdef of
                 Result.Ok me ->
                     Registered me
@@ -267,6 +272,14 @@ handleSocket message =
         [ datetime, "game_joined", gameId, userdef ] ->
             case parsePlayer userdef of
                 Result.Ok newPlayer ->
+                    GameJoined newPlayer gameId
+
+                Result.Err problem ->
+                    Error problem
+
+        [ _, "player", gameId, userdef, isOwner, status ] ->
+            case parsePlayer userdef of
+                Result.Ok newPlayer ->
                     NewPlayer newPlayer
 
                 Result.Err problem ->
@@ -275,7 +288,7 @@ handleSocket message =
         [ date, author, "create", gameId ] ->
             RefreshGames
 
-        [ date, author, "start", secretHex ] ->
+        [ date, "game_started", gameId, secretHex ] ->
             case parseAnswer secretHex of
                 Ok color ->
                     GameStarted color

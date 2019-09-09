@@ -22,10 +22,7 @@ read_notifications(){
 }
 trap 'read_notifications' USR1
 
-logout(){
-  query "delete from session where id=$session_id"
-}
-trap 'logout' EXIT KILL
+trap 'query "delete from session where id=$session_id"' EXIT KILL
 
 # read input from the client
 while read cmd arg1 arg2

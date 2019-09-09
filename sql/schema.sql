@@ -13,8 +13,9 @@ create table command (
       'register',
       'create_game',
       'join_game',
-      'start_game'
-    ) or (id = 1 and type = 'init')),
+      'start_game',
+      'submit_answer'
+    )),
   arg1 varchar,
   arg2 varchar,
   foreign key (user_id) references user (id)
@@ -62,6 +63,7 @@ create table user_game (
   user_id integer not null,
   game_id integer not null,
   created_at integer default (datetime('now')),
+  answer varchar default null,
   primary key(user_id, game_id),
   foreign key (user_id) references user (id),
   foreign key (game_id) references game (id)
@@ -114,6 +116,20 @@ create view get__notifications (session_id, event, timestamp, body) as
   where notification.timestamp > datetime('now', '-1 day')
   order by notification.timestamp;
 
+create view player(game_id, user_id, is_owner, user_status, game_status, created_at) as
+  select
+    user_game.game_id,
+    user_game.user_id,
+    user_game.user_id=game.owner as is_owner,
+    case
+      when user_game.answer is null then 'guessing'
+      else 'done'
+    end as user_status,
+    game.status as game_status,
+    user_game.created_at
+  from game
+  inner join user_game on user_game.game_id=game.id;
+
 create view get__recentgames (session_id, item, id, status, secret_color) as
   select
     active_user.session_id,
@@ -132,23 +148,12 @@ create view get__players (session_id, item, game_id, user, is_owner, user_status
   select
     active_user.session_id,
     'player' as item,
-    user_game.game_id,
-    player.user,
+    player.game_id,
+    printf('%d:%s', active_user.user_id, active_user.username) as user,
     player.is_owner,
     player.user_status
-  from (
-    select
-      user_game.game_id,
-      printf('%d:%s', user.id, user.username) as user,
-      user.id=game.owner as is_owner,
-      'guessing' as user_status,
-      user_game.created_at
-    from game
-    inner join user_game on user_game.game_id=game.id
-    inner join user on user.id=user_game.user_id
-  ) as player
-  inner join user_game using(game_id)
-  inner join active_user using(user_id)
+  from active_user
+  inner join player using(user_id)
   order by player.created_at;
 
 --------------
@@ -231,8 +236,48 @@ create trigger on_start_game after insert on command
       from game where id=new.arg1;
   end;
 
-----------
--- data --
-----------
+create trigger on_submit_answer after insert on command
+  when new.type = 'submit_answer'
+  begin
+    update user_game set answer = ifnull((
+      with recursive
+      input as (select new.arg1 as hexstring),
+      digits(pos, digit) as (
+        select 0, null from input
+        union all
+        select pos+1 as pos, substr(hexstring, pos+1, 1) as digit
+        from input, digits
+        where pos < 6
+      ),
+      value(digit, multiplier) as (
+          select
+            case
+              when digit between '0' and '9' then cast(digit as int)
+              when lower(digit) between 'a' and 'f' then unicode(lower(digit)) - 87
+              else raise(abort, 'malformed_hexcode')
+            end as digit,
+            16 << 4*(5 - pos) as multiplier
+          from digits
+          where pos between 1 and 6
+      )
+      select sum(digit*multiplier) from value, user_game
+        inner join player using (user_id)
+        where game_status='running' and user_status='guessing' and user_id=new.user_id
+      ),
+    raise(abort, 'invalid'))
+    where user_game.user_id=new.user_id;
 
-insert into command(user_id, type) values (NULL, 'init');
+    insert into notification (command_id, name, body, scope)
+      with current as (
+        select
+          user_id,
+          printf('%d:%s', user_id, username) as user,
+          printf('game:%s', game_id) as scope
+        from player
+        inner join active_user using(user_id)
+        where game_status='running'
+      )
+      select new.id, 'answer_submited', current.user, current.scope
+      from current
+      where current.user_id=new.user_id;
+  end;
